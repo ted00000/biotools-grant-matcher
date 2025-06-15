@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """
-Simplified NIH Grant Data Scraper with Sample Data
-Creates a working database for testing the application
+Real NIH Grant Data Scraper - Fixed API Integration
+Fetches actual NIH grants and adds them to existing sample data
 """
 
+import requests
 import sqlite3
 from datetime import datetime
+import time
 import os
 
-class SimpleGrantScraper:
+class RealNIHScraper:
     def __init__(self, db_path="data/grants.db"):
         self.db_path = db_path
+        self.api_url = "https://api.reporter.nih.gov/v2/projects/search"
         # Ensure data directory exists
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.setup_database()
@@ -40,135 +43,136 @@ class SimpleGrantScraper:
         
         conn.commit()
         conn.close()
-        print("✅ Database setup complete")
     
-    def create_sample_data(self):
-        """Create sample grant data for testing"""
-        sample_grants = [
-            {
-                'funding_opportunity_number': 'R01-CA-25-001',
-                'title': 'Novel Biomarker Discovery for Early Cancer Detection',
-                'agency': 'NIH/NCI',
-                'description': 'This program supports innovative research to identify and validate novel biomarkers for early detection of cancer. Projects should focus on developing diagnostic tools that can be translated to clinical practice. Special emphasis on liquid biopsies, circulating tumor DNA, and point-of-care devices.',
-                'amount_min': 250000,
-                'amount_max': 500000,
-                'keywords': 'biomarker, cancer, diagnostic, liquid biopsy, circulating tumor DNA, point-of-care',
-                'eligibility': 'Universities, medical centers, research institutions',
-                'url': 'https://grants.nih.gov/grants/guide/rfa/CA-25-001.html'
+    def fetch_nih_grants_simple(self):
+        """Fetch NIH grants with a simpler, more reliable API call"""
+        print("🔍 Fetching real NIH data (simplified approach)...")
+        
+        # Much simpler payload that's more likely to work
+        payload = {
+            "criteria": {
+                "fiscal_years": [2024, 2025],
+                "activity_codes": ["R01", "R21", "R43", "R44"],  # Common grant types
+                "agencies": ["NIH"]
             },
-            {
-                'funding_opportunity_number': 'R43-EB-25-002',
-                'title': 'SBIR: Microfluidic Devices for Point-of-Care Diagnostics',
-                'agency': 'NIH/NIBIB',
-                'description': 'Small Business Innovation Research program supporting development of microfluidic technologies for point-of-care diagnostic applications. Focus on lab-on-chip devices, portable analyzers, and rapid diagnostic tests for infectious diseases and chronic conditions.',
-                'amount_min': 150000,
-                'amount_max': 300000,
-                'keywords': 'microfluidics, point-of-care, lab-on-chip, diagnostic device, SBIR',
-                'eligibility': 'Small businesses, startups',
-                'url': 'https://grants.nih.gov/grants/guide/rfa/EB-25-002.html'
-            },
-            {
-                'funding_opportunity_number': 'R01-AI-25-003',
-                'title': 'AI-Powered Medical Imaging for Infectious Disease Diagnosis',
-                'agency': 'NIH/NIAID',
-                'description': 'Research program to develop artificial intelligence and machine learning approaches for medical imaging in infectious disease diagnosis. Projects should integrate AI algorithms with existing imaging modalities to improve diagnostic accuracy and speed.',
-                'amount_min': 300000,
-                'amount_max': 750000,
-                'keywords': 'artificial intelligence, medical imaging, machine learning, infectious disease, AI',
-                'eligibility': 'Universities, research hospitals',
-                'url': 'https://grants.nih.gov/grants/guide/rfa/AI-25-003.html'
-            },
-            {
-                'funding_opportunity_number': 'R21-HG-25-004',
-                'title': 'Next-Generation Genomic Sequencing Tools',
-                'agency': 'NIH/NHGRI',
-                'description': 'Exploratory research program for developing innovative genomic sequencing technologies. Focus on portable sequencers, single-cell analysis tools, and real-time genomic analysis platforms. Applications should demonstrate potential for clinical translation.',
-                'amount_min': 200000,
-                'amount_max': 400000,
-                'keywords': 'genomic sequencing, DNA sequencing, single-cell, portable sequencer, genomics',
-                'eligibility': 'Academic institutions, biotechnology companies',
-                'url': 'https://grants.nih.gov/grants/guide/rfa/HG-25-004.html'
-            },
-            {
-                'funding_opportunity_number': 'R44-MD-25-005',
-                'title': 'STTR: Wearable Health Monitoring Devices',
-                'agency': 'NIH/NIMHD',
-                'description': 'Small Business Technology Transfer program supporting development of wearable devices for continuous health monitoring. Emphasis on devices that can detect early signs of disease, monitor chronic conditions, and provide real-time health data to patients and providers.',
-                'amount_min': 500000,
-                'amount_max': 1000000,
-                'keywords': 'wearable device, health monitoring, biosensor, continuous monitoring, STTR',
-                'eligibility': 'Small businesses with academic partnerships',
-                'url': 'https://grants.nih.gov/grants/guide/rfa/MD-25-005.html'
-            },
-            {
-                'funding_opportunity_number': 'R01-GM-25-006',
-                'title': 'Automated Laboratory Instrumentation for Drug Discovery',
-                'agency': 'NIH/NIGMS',
-                'description': 'Program supporting development of automated laboratory systems for high-throughput drug discovery and screening. Projects should focus on robotics, automated sample handling, and integrated analysis platforms that can accelerate pharmaceutical research.',
-                'amount_min': 400000,
-                'amount_max': 800000,
-                'keywords': 'laboratory automation, drug discovery, high-throughput screening, robotics, pharmaceutical',
-                'eligibility': 'Universities, pharmaceutical companies, research institutes',
-                'url': 'https://grants.nih.gov/grants/guide/rfa/GM-25-006.html'
-            },
-            {
-                'funding_opportunity_number': 'R21-NS-25-007',
-                'title': 'Brain-Computer Interface Technologies',
-                'agency': 'NIH/NINDS',
-                'description': 'Exploratory research for developing brain-computer interface technologies for neurological applications. Focus on neural prosthetics, brain stimulation devices, and neurofeedback systems. Projects should address both technical development and clinical translation.',
-                'amount_min': 300000,
-                'amount_max': 600000,
-                'keywords': 'brain-computer interface, neural prosthetics, neurotechnology, brain stimulation',
-                'eligibility': 'Research universities, medical centers',
-                'url': 'https://grants.nih.gov/grants/guide/rfa/NS-25-007.html'
-            },
-            {
-                'funding_opportunity_number': 'R01-DK-25-008',
-                'title': 'Biosensors for Diabetes Management',
-                'agency': 'NIH/NIDDK',
-                'description': 'Research program for developing advanced biosensor technologies for diabetes monitoring and management. Focus on continuous glucose monitors, insulin delivery systems, and integrated diabetes management platforms. Emphasis on improving patient outcomes and quality of life.',
-                'amount_min': 350000,
-                'amount_max': 700000,
-                'keywords': 'biosensor, diabetes, glucose monitoring, insulin delivery, continuous monitoring',
-                'eligibility': 'Academic medical centers, biotechnology companies',
-                'url': 'https://grants.nih.gov/grants/guide/rfa/DK-25-008.html'
-            },
-            {
-                'funding_opportunity_number': 'R43-HL-25-009',
-                'title': 'SBIR: Cardiovascular Diagnostic Devices',
-                'agency': 'NIH/NHLBI',
-                'description': 'Small Business Innovation Research program for cardiovascular diagnostic technologies. Support for development of portable ECG devices, cardiac biomarker tests, and imaging technologies for heart disease detection. Focus on point-of-care and home-use applications.',
-                'amount_min': 200000,
-                'amount_max': 350000,
-                'keywords': 'cardiovascular, diagnostic device, ECG, cardiac biomarker, heart disease',
-                'eligibility': 'Small businesses, medical device startups',
-                'url': 'https://grants.nih.gov/grants/guide/rfa/HL-25-009.html'
-            },
-            {
-                'funding_opportunity_number': 'R01-CA-25-010',
-                'title': 'Immunotherapy Biomarker Development',
-                'agency': 'NIH/NCI',
-                'description': 'Research program supporting development of biomarkers to predict and monitor immunotherapy response in cancer patients. Focus on developing companion diagnostic tests, predictive algorithms, and personalized medicine approaches for cancer immunotherapy.',
-                'amount_min': 400000,
-                'amount_max': 900000,
-                'keywords': 'immunotherapy, cancer biomarker, companion diagnostic, personalized medicine, oncology',
-                'eligibility': 'Cancer centers, research universities',
-                'url': 'https://grants.nih.gov/grants/guide/rfa/CA-25-010.html'
-            }
+            "include_fields": [
+                "ProjectTitle",
+                "AbstractText",
+                "ProjectNum",
+                "Organization",
+                "ProjectStartDate",
+                "ProjectEndDate",
+                "AwardAmount",
+                "ActivityCode",
+                "Agency"
+            ],
+            "offset": 0,
+            "limit": 100,  # Start smaller
+            "sort_field": "project_start_date",
+            "sort_order": "desc"
+        }
+        
+        try:
+            print(f"Making API request to: {self.api_url}")
+            response = requests.post(
+                self.api_url, 
+                json=payload,
+                headers={'Content-Type': 'application/json'},
+                timeout=30
+            )
+            
+            print(f"Response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                projects = data.get('results', [])
+                print(f"✅ Successfully fetched {len(projects)} NIH projects")
+                return self.process_nih_projects(projects)
+            else:
+                print(f"❌ API Error: {response.status_code}")
+                print(f"Response: {response.text[:500]}")
+                return []
+                
+        except requests.RequestException as e:
+            print(f"❌ Network error: {e}")
+            return []
+        except Exception as e:
+            print(f"❌ Unexpected error: {e}")
+            return []
+    
+    def process_nih_projects(self, projects):
+        """Convert NIH API projects to our grant format"""
+        grants = []
+        
+        biotools_keywords = [
+            'biomarker', 'diagnostic', 'device', 'biosensor', 'microfluidic',
+            'imaging', 'sequencing', 'automation', 'point-of-care', 'wearable',
+            'artificial intelligence', 'machine learning', 'genomic', 'proteomic',
+            'bioinformatics', 'lab-on-chip', 'molecular', 'assay', 'screening'
         ]
         
-        return sample_grants
+        for project in projects:
+            title = project.get('project_title', '')
+            abstract = project.get('abstract_text', '')
+            
+            # Only include projects that seem related to biotools
+            if self.is_biotools_related(title + ' ' + abstract, biotools_keywords):
+                
+                # Extract keywords from abstract
+                keywords = self.extract_keywords(abstract, biotools_keywords)
+                
+                grant = {
+                    'funding_opportunity_number': project.get('project_num', ''),
+                    'title': title,
+                    'agency': 'NIH',
+                    'description': abstract[:1000] if abstract else '',  # Truncate long abstracts
+                    'amount_min': 0,
+                    'amount_max': project.get('award_amount', 0) or 0,
+                    'keywords': ', '.join(keywords),
+                    'eligibility': project.get('organization', {}).get('org_name', ''),
+                    'url': f"https://reporter.nih.gov/search/{project.get('project_num', '')}"
+                }
+                grants.append(grant)
+        
+        print(f"📊 Filtered to {len(grants)} biotools-related grants")
+        return grants
+    
+    def is_biotools_related(self, text, keywords):
+        """Check if project text contains biotools-related keywords"""
+        text_lower = text.lower()
+        return any(keyword in text_lower for keyword in keywords)
+    
+    def extract_keywords(self, text, keyword_list):
+        """Extract relevant keywords from project text"""
+        if not text:
+            return []
+        
+        text_lower = text.lower()
+        found_keywords = []
+        
+        for keyword in keyword_list:
+            if keyword in text_lower:
+                found_keywords.append(keyword)
+        
+        return found_keywords[:8]  # Limit to 8 keywords
     
     def save_grants(self, grants):
-        """Save grants to database"""
+        """Save grants to database (add to existing data)"""
+        if not grants:
+            print("⚠️ No grants to save")
+            return 0
+            
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         saved_count = 0
+        duplicate_count = 0
+        
         for grant in grants:
             try:
+                # Try to insert, ignore if duplicate
                 cursor.execute('''
-                    INSERT OR REPLACE INTO grants 
+                    INSERT OR IGNORE INTO grants 
                     (funding_opportunity_number, title, agency, description, 
                      amount_min, amount_max, keywords, eligibility, url, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -184,37 +188,67 @@ class SimpleGrantScraper:
                     grant['url'],
                     datetime.now()
                 ))
-                saved_count += 1
+                
+                if cursor.rowcount > 0:
+                    saved_count += 1
+                else:
+                    duplicate_count += 1
+                    
             except sqlite3.Error as e:
                 print(f"Error saving grant {grant.get('title', 'Unknown')}: {e}")
         
         conn.commit()
         conn.close()
         
-        print(f"✅ Saved {saved_count} grants to database")
+        print(f"✅ Saved {saved_count} new grants")
+        if duplicate_count > 0:
+            print(f"📝 Skipped {duplicate_count} duplicates")
+        
         return saved_count
     
-    def run_scraper(self):
-        """Run the complete scraping process with sample data"""
-        print("🔬 Starting BioTools Grant Matcher - Sample Data Setup...")
+    def get_current_stats(self):
+        """Get current database statistics"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
         
-        # Create sample grants
-        sample_grants = self.create_sample_data()
+        cursor.execute("SELECT COUNT(*) FROM grants")
+        total = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM grants WHERE agency = 'NIH'")
+        nih_count = cursor.fetchone()[0]
+        
+        conn.close()
+        return total, nih_count
+    
+    def run_scraper(self):
+        """Run the complete scraping process"""
+        print("🧬 Starting Real NIH Grant Scraper...")
+        
+        # Get current stats
+        before_total, before_nih = self.get_current_stats()
+        print(f"📊 Current database: {before_total} total grants ({before_nih} from NIH)")
+        
+        # Fetch real NIH data
+        nih_grants = self.fetch_nih_grants_simple()
         
         # Save to database
-        saved_count = self.save_grants(sample_grants)
+        saved_count = self.save_grants(nih_grants)
+        
+        # Get final stats
+        after_total, after_nih = self.get_current_stats()
+        
+        print(f"\n📈 Final database: {after_total} total grants ({after_nih} from NIH)")
+        print(f"✅ Added {saved_count} new real NIH grants")
         
         if saved_count > 0:
-            print(f"✅ Setup complete! Created database with {saved_count} sample grants.")
-            print(f"📍 Database location: {self.db_path}")
-            print("\n🚀 You can now run: python app.py")
+            print(f"🚀 Success! Your database now has real NIH data.")
         else:
-            print("❌ No grants were saved.")
+            print("ℹ️ No new grants added (API might be down or no new biotools grants found)")
         
         return saved_count
 
 def main():
-    scraper = SimpleGrantScraper()
+    scraper = RealNIHScraper()
     scraper.run_scraper()
 
 if __name__ == "__main__":
