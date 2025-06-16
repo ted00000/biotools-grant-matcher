@@ -319,22 +319,16 @@ class SBIRScraper:
         
         return min(score, 10.0)  # Cap at 10.0
     
-    def make_api_request(self, endpoint: str, params: Dict[str, Any] = None, max_retries: int = 3) -> Optional[Dict]:
+    def make_api_request(self, endpoint: str, params: Dict[str, Any] = None, max_retries: int = 3) -> Optional[List]:
         """Make API request with retry logic"""
         url = f"{self.base_url}/{endpoint}"
-        
-        self.logger.info(f"    Making request to: {url}")
-        self.logger.info(f"    Params: {params}")
         
         for attempt in range(max_retries):
             try:
                 response = requests.get(url, params=params, timeout=30)
                 
-                self.logger.info(f"    Response status: {response.status_code}")
-                
                 if response.status_code == 200:
                     data = response.json()
-                    self.logger.info(f"    Response type: {type(data)}, length: {len(data) if isinstance(data, list) else 'N/A'}")
                     return data
                 elif response.status_code == 429:
                     # Rate limited, wait longer
@@ -343,7 +337,6 @@ class SBIRScraper:
                     time.sleep(wait_time)
                 else:
                     self.logger.error(f"API request failed: {response.status_code}")
-                    self.logger.error(f"Response text: {response.text[:200]}")
                     return None
                     
             except Exception as e:
@@ -359,9 +352,7 @@ class SBIRScraper:
         self.logger.info(f"Fetching {agency} awards from {start_year}...")
         
         awards = []
-        start = 0
         rows_per_request = 1000  # Maximum for awards API
-        
         current_year = datetime.now().year
         
         for year in range(start_year, current_year + 1):
@@ -378,15 +369,12 @@ class SBIRScraper:
                     'format': 'json'
                 }
                 
-                self.logger.info(f"    API call: agency={agency}, year={year}, start={year_start}, rows={rows_per_request}")
                 data = self.make_api_request('awards', params)
                 
-                self.logger.info(f"    API response: {type(data)}, length: {len(data) if isinstance(data, list) else 'N/A'}")
-                
-                if not data or 'results' not in data:
+                if not data or not isinstance(data, list):
                     break
                 
-                batch_awards = data['results']
+                batch_awards = data
                 if not batch_awards:
                     break
                 
@@ -395,19 +383,20 @@ class SBIRScraper:
                 for award in batch_awards:
                     title = award.get('award_title', '')
                     abstract = award.get('abstract', '')
-                    keywords = award.get('research_area_keywords', '')
+                    keywords = award.get('research_area_keywords', '') or ''
                     
-                    if self.is_biotools_relevant(f"{title} {abstract} {keywords}"):
+                    combined_text = f"{title} {abstract} {keywords}"
+                    
+                    if self.is_biotools_relevant(combined_text):
                         award['relevance_score'] = self.calculate_biotools_relevance_score(title, abstract, keywords)
                         relevant_awards.append(award)
                 
                 awards.extend(relevant_awards)
-                year_awards += len(batch_awards)  # Track total processed
+                year_awards += len(batch_awards)
                 self.logger.info(f"    Batch: {len(batch_awards)} total, {len(relevant_awards)} biotools-relevant")
                 
                 # If we got fewer results than requested, we're done with this year
                 if len(batch_awards) < rows_per_request:
-                    self.logger.info(f"    End of data for {agency} {year} (got {len(batch_awards)} < {rows_per_request})")
                     break
                 
                 year_start += rows_per_request
@@ -436,10 +425,10 @@ class SBIRScraper:
             
             data = self.make_api_request('solicitations', params)
             
-            if not data or 'results' not in data:
+            if not data or not isinstance(data, list):
                 break
             
-            batch_solicitations = data['results']
+            batch_solicitations = data
             if not batch_solicitations:
                 break
             
@@ -500,10 +489,10 @@ class SBIRScraper:
                 
                 data = self.make_api_request('firm', params)
                 
-                if not data or 'results' not in data:
+                if not data or not isinstance(data, list):
                     break
                 
-                batch_companies = data['results']
+                batch_companies = data
                 if not batch_companies:
                     break
                 
@@ -556,8 +545,8 @@ class SBIRScraper:
                         number_employees, poc_name, poc_title, poc_phone, poc_email,
                         pi_name, pi_phone, pi_email, ri_name, ri_poc_name, ri_poc_phone,
                         url, data_source, grant_type, biotools_category, relevance_score,
-                        updated_at, last_scraped_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     funding_opportunity_number,
                     award.get('award_title', ''),
@@ -604,7 +593,6 @@ class SBIRScraper:
                     'award',
                     'biotools',
                     award.get('relevance_score', 0.0),
-                    current_time,
                     current_time
                 ))
                 
@@ -730,33 +718,48 @@ class SBIRScraper:
         stats = {}
         
         # Total grants (awards)
-        cursor.execute("SELECT COUNT(*) FROM grants WHERE grant_type = 'award'")
+        cursor.execute("SELECT COUNT(*) FROM grants WHERE grant_type = 'award' OR grant_type IS NULL")
         stats['total_awards'] = cursor.fetchone()[0]
         
         # Total solicitations
-        cursor.execute("SELECT COUNT(*) FROM solicitations")
-        stats['total_solicitations'] = cursor.fetchone()[0]
+        try:
+            cursor.execute("SELECT COUNT(*) FROM solicitations")
+            stats['total_solicitations'] = cursor.fetchone()[0]
+        except sqlite3.OperationalError:
+            stats['total_solicitations'] = 0
         
         # Total companies
-        cursor.execute("SELECT COUNT(*) FROM sbir_companies")
-        stats['total_companies'] = cursor.fetchone()[0]
+        try:
+            cursor.execute("SELECT COUNT(*) FROM sbir_companies")
+            stats['total_companies'] = cursor.fetchone()[0]
+        except sqlite3.OperationalError:
+            stats['total_companies'] = 0
         
         # By agency
         cursor.execute("SELECT agency, COUNT(*) FROM grants GROUP BY agency ORDER BY COUNT(*) DESC")
         stats['by_agency'] = cursor.fetchall()
         
         # By phase
-        cursor.execute("SELECT phase, COUNT(*) FROM grants GROUP BY phase ORDER BY COUNT(*) DESC")
-        stats['by_phase'] = cursor.fetchall()
+        try:
+            cursor.execute("SELECT phase, COUNT(*) FROM grants WHERE phase IS NOT NULL GROUP BY phase ORDER BY COUNT(*) DESC")
+            stats['by_phase'] = cursor.fetchall()
+        except sqlite3.OperationalError:
+            stats['by_phase'] = []
         
         # Recent awards (last 2 years)
         current_year = datetime.now().year
-        cursor.execute("SELECT COUNT(*) FROM grants WHERE award_year >= ?", (current_year - 1,))
-        stats['recent_awards'] = cursor.fetchone()[0]
+        try:
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE award_year >= ?", (current_year - 1,))
+            stats['recent_awards'] = cursor.fetchone()[0]
+        except sqlite3.OperationalError:
+            stats['recent_awards'] = 0
         
         # Open solicitations
-        cursor.execute("SELECT COUNT(*) FROM solicitations WHERE current_status = 'Open'")
-        stats['open_solicitations'] = cursor.fetchone()[0]
+        try:
+            cursor.execute("SELECT COUNT(*) FROM solicitations WHERE current_status = 'open'")
+            stats['open_solicitations'] = cursor.fetchone()[0]
+        except sqlite3.OperationalError:
+            stats['open_solicitations'] = 0
         
         conn.close()
         return stats
@@ -920,10 +923,10 @@ def main():
             
         else:
             print("Usage:")
-            print("  python sbir_scraper.py full [start_year]    # Full data collection")
-            print("  python sbir_scraper.py solicitations       # Update solicitations only")
-            print("  python sbir_scraper.py recent [months]     # Update recent awards")
-            print("  python sbir_scraper.py stats               # Show database stats")
+            print("  python app/scraper.py full [start_year]    # Full data collection")
+            print("  python app/scraper.py solicitations       # Update solicitations only")
+            print("  python app/scraper.py recent [months]     # Update recent awards")
+            print("  python app/scraper.py stats               # Show database stats")
     else:
         # Default: run full scraping from 2020
         scraper.run_full_scraping(2020)
