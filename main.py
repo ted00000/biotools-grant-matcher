@@ -35,27 +35,19 @@ DIGITALOCEAN_AGENT_URL = os.getenv('DO_AGENT_URL', '')
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(16))
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1MB max request size
 
-# Rate limiting configuration
-# Try Redis first, fall back to memory storage
-try:
-    import redis
-    redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
-    redis_client.ping()  # Test connection
-    limiter = Limiter(
-        app,
-        key_func=get_remote_address,
-        storage_uri="redis://localhost:6379",
-        default_limits=["1000 per hour", "100 per minute"]
-    )
-    print("✅ Using Redis for rate limiting")
-except (ImportError, redis.exceptions.ConnectionError, redis.exceptions.ResponseError):
-    print("⚠️  Redis not available, using memory storage for rate limiting")
-    limiter = Limiter(
-        app,
-        key_func=get_remote_address,
-        storage_uri="memory://",
-        default_limits=["200 per hour", "20 per minute"]
-    )
+# Simplified rate limiting configuration
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+# Initialize limiter with memory storage (simple and reliable)
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    storage_uri="memory://",
+    default_limits=["200 per hour", "20 per minute"]
+)
+
+print("✅ Using memory storage for rate limiting")
 
 # Logging configuration
 logging.basicConfig(
