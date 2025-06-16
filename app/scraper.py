@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive Life Science Tools and Technology Scraper
-Searches for the full spectrum of biotools/life science tools
+Fixed Scraper - Focus on Working APIs and Fix NSF Issues
 """
 
 import requests
@@ -10,65 +9,11 @@ from datetime import datetime
 import time
 import os
 
-class ComprehensiveBiotoolsScraper:
+class FixedScraper:
     def __init__(self, db_path="data/grants.db"):
         self.db_path = db_path
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.setup_database()
-        
-        # Comprehensive life science tool categories
-        self.biotools_categories = {
-            'instrumentation': [
-                'microscopy', 'spectrometry', 'mass spectrometer', 'flow cytometer', 
-                'DNA sequencer', 'protein analyzer', 'cell counter', 'plate reader',
-                'fluorescence imaging', 'confocal microscope', 'electron microscope'
-            ],
-            'laboratory_equipment': [
-                'centrifuge', 'incubator', 'thermal cycler', 'PCR machine', 
-                'electrophoresis', 'chromatography', 'liquid handler', 'pipette',
-                'biosafety cabinet', 'autoclave', 'pH meter', 'balance'
-            ],
-            'molecular_biology': [
-                'PCR', 'qPCR', 'DNA extraction', 'RNA extraction', 'protein purification',
-                'gel electrophoresis', 'western blot', 'ELISA', 'immunoassay',
-                'cloning', 'transfection', 'cell culture', 'tissue culture'
-            ],
-            'analytical_tools': [
-                'HPLC', 'LCMS', 'NMR', 'X-ray crystallography', 'surface plasmon resonance',
-                'dynamic light scattering', 'circular dichroism', 'UV-Vis spectroscopy',
-                'infrared spectroscopy', 'atomic force microscopy'
-            ],
-            'genomics': [
-                'genome sequencing', 'RNA sequencing', 'ChIP-seq', 'CRISPR', 
-                'gene editing', 'SNP analysis', 'microarray', 'genotyping',
-                'next generation sequencing', 'single cell sequencing'
-            ],
-            'proteomics': [
-                'protein analysis', 'mass spectrometry proteomics', 'protein folding',
-                'protein interaction', 'enzyme assay', 'protein crystallization',
-                'peptide synthesis', 'amino acid analysis'
-            ],
-            'cell_biology': [
-                'cell imaging', 'live cell imaging', 'cell sorting', 'cell counting',
-                'cell viability', 'apoptosis assay', 'cell cycle analysis',
-                'calcium imaging', 'patch clamp', 'electrophysiology'
-            ],
-            'bioinformatics': [
-                'sequence analysis', 'phylogenetic analysis', 'molecular modeling',
-                'protein structure prediction', 'drug discovery software',
-                'database management', 'statistical analysis', 'data mining'
-            ],
-            'automation': [
-                'laboratory automation', 'robotic liquid handling', 'automated imaging',
-                'high throughput screening', 'laboratory information management',
-                'workflow automation', 'sample tracking'
-            ],
-            'diagnostics': [
-                'point of care testing', 'immunodiagnostics', 'molecular diagnostics',
-                'biosensor', 'biomarker discovery', 'clinical chemistry analyzer',
-                'rapid testing', 'multiplex assay'
-            ]
-        }
     
     def setup_database(self):
         """Create database tables if they don't exist"""
@@ -97,103 +42,128 @@ class ComprehensiveBiotoolsScraper:
         conn.commit()
         conn.close()
     
-    def get_search_terms(self):
-        """Generate comprehensive search terms for life science tools"""
-        # Primary broad terms
-        primary_terms = [
-            'laboratory instrumentation', 'research instrumentation', 
-            'analytical instrumentation', 'life science tools',
-            'biotechnology tools', 'research equipment',
-            'scientific instrumentation', 'laboratory technology'
+    def fetch_nsf_grants_fixed(self):
+        """Fixed NSF API calls with proper parameters"""
+        print("🔬 Fetching NSF grants (fixed API calls)...")
+        
+        grants = []
+        
+        # Simplified search terms that NSF API can handle
+        simple_terms = [
+            "biotechnology",
+            "instrumentation", 
+            "laboratory",
+            "microscopy",
+            "spectrometry"
         ]
         
-        # Category-specific terms
-        category_terms = []
-        for category, terms in self.biotools_categories.items():
-            category_terms.extend(terms[:5])  # Top 5 terms per category
-        
-        # Combine and return unique terms
-        all_terms = primary_terms + category_terms
-        return list(set(all_terms))
-    
-    def fetch_nsf_grants(self):
-        """Fetch NSF grants with comprehensive biotools search"""
-        print("🔬 Fetching NSF grants for life science tools...")
-        
-        grants = []
-        search_terms = self.get_search_terms()
-        
-        print(f"  Using {len(search_terms)} search terms covering:")
-        for category in self.biotools_categories.keys():
-            print(f"    • {category.replace('_', ' ').title()}")
-        
-        # Search in batches to avoid overwhelming the API
-        for i, term in enumerate(search_terms[:20]):  # Limit to avoid too many requests
+        for term in simple_terms:
             try:
+                # Simplified NSF API call
                 url = "https://api.nsf.gov/services/v1/awards.json"
+                
+                # Basic parameters only
                 params = {
                     'keyword': term,
-                    'rpp': '15',  # Fewer per term, but more terms
-                    'printFields': 'id,title,fundsObligatedAmt,abstractText,awardee,program'
+                    'rpp': '25'
                 }
                 
-                print(f"  [{i+1:2d}/{len(search_terms[:20])}] Searching: '{term}'...")
-                response = requests.get(url, params=params, timeout=20)
+                print(f"  Testing NSF API with '{term}'...")
+                
+                # Add headers to look more like a browser
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (compatible; Research/1.0)',
+                    'Accept': 'application/json'
+                }
+                
+                response = requests.get(url, params=params, headers=headers, timeout=15)
+                
+                print(f"    Status: {response.status_code}")
                 
                 if response.status_code == 200:
-                    data = response.json()
-                    
-                    awards = []
-                    if isinstance(data, dict) and 'response' in data:
-                        response_data = data['response']
-                        if isinstance(response_data, dict) and 'award' in response_data:
-                            awards_data = response_data['award']
-                            if isinstance(awards_data, list):
-                                awards = awards_data
-                            elif isinstance(awards_data, dict):
-                                awards = [awards_data]
-                    
-                    relevant_count = 0
-                    for award in awards:
-                        if isinstance(award, dict):
-                            title = award.get('title', '')
-                            abstract = award.get('abstractText', '')
-                            
-                            if self.is_biotools_relevant(title, abstract):
-                                category = self.categorize_biotools(title + ' ' + abstract)
-                                grant = self.parse_nsf_award(award, category)
+                    try:
+                        data = response.json()
+                        
+                        # Debug: show response structure
+                        print(f"    Response type: {type(data)}")
+                        if isinstance(data, dict):
+                            print(f"    Keys: {list(data.keys())}")
+                        
+                        # Process awards if found
+                        awards = self.extract_nsf_awards(data)
+                        print(f"    Found {len(awards)} awards")
+                        
+                        for award in awards:
+                            if self.is_biotools_relevant(award.get('title', '') + ' ' + award.get('abstractText', '')):
+                                grant = self.parse_nsf_award(award)
                                 if grant:
                                     grants.append(grant)
-                                    relevant_count += 1
+                                    print(f"      ✅ Added: {award.get('title', '')[:50]}...")
                     
-                    print(f"      Found {relevant_count} relevant grants")
+                    except Exception as e:
+                        print(f"    JSON parsing error: {e}")
+                
+                elif response.status_code == 400:
+                    print(f"    400 Error - Bad Request for '{term}'")
+                    print(f"    Response: {response.text[:200]}...")
+                    # Try with even simpler parameters
+                    continue
                 
                 else:
-                    print(f"      API error: {response.status_code}")
+                    print(f"    HTTP {response.status_code}: {response.text[:100]}...")
                 
-                time.sleep(1.5)  # Rate limiting
+                # Longer delay to be extra respectful
+                time.sleep(3)
                 
+            except requests.exceptions.Timeout:
+                print(f"    Timeout for '{term}'")
+                continue
             except Exception as e:
-                print(f"      Error: {e}")
+                print(f"    Error for '{term}': {e}")
                 continue
         
-        print(f"✅ Collected {len(grants)} NSF life science tool grants")
+        print(f"✅ NSF: Collected {len(grants)} grants")
         return grants
     
-    def fetch_nih_grants(self):
-        """Fetch NIH grants with comprehensive biotools search"""
-        print("🧬 Fetching NIH grants for life science tools...")
+    def extract_nsf_awards(self, data):
+        """Extract awards from NSF API response"""
+        awards = []
+        
+        try:
+            if isinstance(data, dict):
+                if 'response' in data:
+                    response_data = data['response']
+                    if isinstance(response_data, dict) and 'award' in response_data:
+                        awards_data = response_data['award']
+                        if isinstance(awards_data, list):
+                            awards = awards_data
+                        elif isinstance(awards_data, dict):
+                            awards = [awards_data]
+        except Exception as e:
+            print(f"      Award extraction error: {e}")
+        
+        return awards
+    
+    def fetch_nih_grants_expanded(self):
+        """Expanded NIH search since it's working well"""
+        print("🧬 Fetching NIH grants (expanded search)...")
         
         grants = []
         
-        # NIH search with broader life science tool terms
+        # Expanded NIH search queries for life science tools
         search_queries = [
-            "laboratory instrumentation OR research instrumentation OR analytical instrumentation",
-            "microscopy OR spectrometry OR chromatography OR electrophoresis",
-            "PCR OR sequencing OR protein analysis OR cell analysis",
-            "bioengineering OR biotechnology OR life science technology",
-            "laboratory automation OR high throughput screening OR robotics",
-            "bioinformatics OR computational biology OR data analysis tools"
+            "laboratory instrumentation OR research instrumentation",
+            "microscopy OR imaging OR spectroscopy",
+            "biotechnology OR bioengineering",
+            "analytical instrumentation OR analytical methods",
+            "laboratory automation OR high throughput",
+            "molecular biology tools OR molecular techniques",
+            "protein analysis OR genomics OR proteomics",
+            "cell biology tools OR cell analysis",
+            "bioinformatics OR computational biology",
+            "diagnostic tools OR biosensors",
+            "chromatography OR electrophoresis OR mass spectrometry",
+            "laboratory equipment OR scientific instruments"
         ]
         
         for i, search_text in enumerate(search_queries):
@@ -216,13 +186,14 @@ class ComprehensiveBiotoolsScraper:
                     "limit": 50
                 }
                 
-                print(f"  [{i+1}/{len(search_queries)}] NIH search: {search_text[:50]}...")
+                print(f"  [{i+1:2d}/{len(search_queries)}] '{search_text[:40]}...'")
+                
                 response = requests.post(url, json=payload, timeout=30)
                 
                 if response.status_code == 200:
                     data = response.json()
                     
-                    if 'results' in data:
+                    if 'results' in data and data['results']:
                         projects = data['results']
                         relevant_count = 0
                         
@@ -231,65 +202,73 @@ class ComprehensiveBiotoolsScraper:
                             abstract = project.get('abstract_text', '')
                             
                             if self.is_biotools_relevant(title, abstract):
-                                category = self.categorize_biotools(title + ' ' + abstract)
-                                grant = self.parse_nih_project(project, category)
+                                grant = self.parse_nih_project(project)
                                 if grant:
                                     grants.append(grant)
                                     relevant_count += 1
                         
-                        print(f"      Found {relevant_count} relevant grants")
+                        print(f"      Found {relevant_count} relevant biotools grants")
                     else:
                         print("      No results")
-                        
-                else:
-                    print(f"      API error: {response.status_code}")
                 
-                time.sleep(2)  # Rate limiting
+                else:
+                    print(f"      Error {response.status_code}")
+                
+                time.sleep(1)  # Short delay
                 
             except Exception as e:
                 print(f"      Error: {e}")
                 continue
         
-        print(f"✅ Collected {len(grants)} NIH life science tool grants")
+        print(f"✅ NIH: Collected {len(grants)} grants")
         return grants
     
-    def is_biotools_relevant(self, title, abstract):
-        """Enhanced relevance checking for life science tools"""
+    def test_nsf_api(self):
+        """Test NSF API with minimal request to debug 400 errors"""
+        print("🔍 Testing NSF API connectivity...")
+        
+        try:
+            # Most basic possible request
+            url = "https://api.nsf.gov/services/v1/awards.json"
+            params = {'rpp': '5'}  # Just get 5 records, no keyword
+            
+            response = requests.get(url, params=params, timeout=10)
+            
+            print(f"  Basic test: {response.status_code}")
+            
+            if response.status_code == 200:
+                print("  ✅ NSF API is accessible")
+                data = response.json()
+                print(f"  Response has {len(data.get('response', {}).get('award', []))} awards")
+                return True
+            else:
+                print(f"  ❌ NSF API error: {response.status_code}")
+                print(f"  Response: {response.text[:200]}")
+                return False
+                
+        except Exception as e:
+            print(f"  ❌ NSF API connection failed: {e}")
+            return False
+    
+    def is_biotools_relevant(self, title, abstract=''):
+        """Check if content is relevant to life science tools"""
         text = (title + ' ' + abstract).lower()
         
-        # Must contain at least one term from any category
-        for category, terms in self.biotools_categories.items():
-            if any(term.lower() in text for term in terms):
-                return True
-        
-        # Additional broad life science tool indicators
-        broad_indicators = [
-            'laboratory', 'research tool', 'scientific instrument', 
-            'analytical method', 'measurement technique', 'experimental method',
-            'assay development', 'protocol development', 'technology development'
+        # Life science tool keywords
+        biotools_terms = [
+            'laboratory', 'instrumentation', 'microscopy', 'spectrometry', 
+            'biotechnology', 'bioengineering', 'analytical', 'diagnostic',
+            'protein analysis', 'dna analysis', 'cell analysis', 'genomics',
+            'proteomics', 'bioinformatics', 'molecular biology', 'chromatography',
+            'electrophoresis', 'mass spectrometry', 'imaging', 'automation',
+            'high throughput', 'assay', 'biosensor', 'lab equipment',
+            'research tool', 'scientific instrument'
         ]
         
-        return any(indicator in text for indicator in broad_indicators)
+        return any(term in text for term in biotools_terms)
     
-    def categorize_biotools(self, text):
-        """Categorize the biotools grant by type"""
-        text_lower = text.lower()
-        
-        # Score each category
-        category_scores = {}
-        for category, terms in self.biotools_categories.items():
-            score = sum(1 for term in terms if term.lower() in text_lower)
-            if score > 0:
-                category_scores[category] = score
-        
-        # Return the highest scoring category
-        if category_scores:
-            return max(category_scores, key=category_scores.get)
-        
-        return 'general_life_science'
-    
-    def parse_nsf_award(self, award, category):
-        """Parse NSF award with category information"""
+    def parse_nsf_award(self, award):
+        """Parse NSF award data"""
         try:
             award_id = award.get('id', '')
             title = award.get('title', '')
@@ -299,35 +278,32 @@ class ComprehensiveBiotoolsScraper:
             if 'fundsObligatedAmt' in award:
                 try:
                     amount = int(float(str(award['fundsObligatedAmt'])))
-                except (ValueError, TypeError):
+                except:
                     amount = 0
             
             org = "Research Institution"
             if 'awardee' in award and isinstance(award['awardee'], dict):
-                org_name = award['awardee'].get('name', '')
-                if org_name:
-                    org = org_name[:200]
+                org = award['awardee'].get('name', org)[:200]
             
             return {
                 'funding_opportunity_number': f"NSF-{award_id}",
                 'title': title[:250] if title else f"NSF Award {award_id}",
                 'agency': 'NSF',
-                'description': abstract[:1000] if abstract else 'NSF funded research project',
+                'description': abstract[:1000] if abstract else '',
                 'amount_min': 0,
                 'amount_max': amount,
                 'keywords': self.extract_keywords(title + ' ' + abstract),
                 'eligibility': org,
                 'url': f"https://www.nsf.gov/awardsearch/showAward?AWD_ID={award_id}",
-                'biotools_category': category,
+                'biotools_category': 'nsf_research',
                 'deadline': None
             }
             
         except Exception as e:
-            print(f"    Parse error: {e}")
             return None
     
-    def parse_nih_project(self, project, category):
-        """Parse NIH project with category information"""
+    def parse_nih_project(self, project):
+        """Parse NIH project data"""
         try:
             appl_id = project.get('appl_id', '')
             title = project.get('project_title', '')
@@ -337,54 +313,51 @@ class ComprehensiveBiotoolsScraper:
             if 'total_cost_amount' in project:
                 try:
                     amount = int(project['total_cost_amount'])
-                except (ValueError, TypeError):
+                except:
                     amount = 0
             
             org = "Research Institution"
             if 'organization' in project and isinstance(project['organization'], dict):
-                org_name = project['organization'].get('org_name', '')
-                if org_name:
-                    org = org_name[:200]
+                org = project['organization'].get('org_name', org)[:200]
             
             return {
                 'funding_opportunity_number': f"NIH-{appl_id}",
                 'title': title[:250] if title else f"NIH Project {appl_id}",
                 'agency': 'NIH',
-                'description': abstract[:1000] if abstract else 'NIH funded research project',
+                'description': abstract[:1000] if abstract else '',
                 'amount_min': 0,
                 'amount_max': amount,
                 'keywords': self.extract_keywords(title + ' ' + abstract),
                 'eligibility': org,
                 'url': f"https://reporter.nih.gov/project-details/{appl_id}",
-                'biotools_category': category,
+                'biotools_category': 'nih_research',
                 'deadline': None
             }
             
         except Exception as e:
-            print(f"    Parse error: {e}")
             return None
     
     def extract_keywords(self, text):
-        """Extract life science tool keywords"""
+        """Extract relevant keywords"""
         if not text:
             return ''
         
-        # Comprehensive keyword list
-        all_keywords = []
-        for terms in self.biotools_categories.values():
-            all_keywords.extend(terms)
+        keywords = [
+            'microscopy', 'spectrometry', 'chromatography', 'biotechnology',
+            'proteomics', 'genomics', 'bioinformatics', 'analytical',
+            'instrumentation', 'automation', 'imaging', 'laboratory'
+        ]
         
-        # Find matching keywords
         found = []
         text_lower = text.lower()
-        for keyword in all_keywords:
-            if keyword.lower() in text_lower and keyword not in found:
+        for keyword in keywords:
+            if keyword in text_lower and keyword not in found:
                 found.append(keyword)
         
-        return ', '.join(found[:10])  # Top 10 keywords
+        return ', '.join(found[:8])
     
     def save_grants(self, grants, source_name):
-        """Save grants to database with category information"""
+        """Save grants to database"""
         if not grants:
             print(f"⚠️ No {source_name} grants to save")
             return 0
@@ -396,7 +369,7 @@ class ComprehensiveBiotoolsScraper:
         try:
             cursor.execute("ALTER TABLE grants ADD COLUMN biotools_category TEXT")
         except sqlite3.OperationalError:
-            pass  # Column already exists
+            pass
         
         saved_count = 0
         duplicate_count = 0
@@ -442,7 +415,7 @@ class ComprehensiveBiotoolsScraper:
         return saved_count
     
     def get_stats(self):
-        """Get comprehensive database statistics"""
+        """Get database statistics"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -452,67 +425,58 @@ class ComprehensiveBiotoolsScraper:
         cursor.execute("SELECT agency, COUNT(*) FROM grants GROUP BY agency ORDER BY COUNT(*) DESC")
         by_agency = cursor.fetchall()
         
-        # Get category breakdown
-        try:
-            cursor.execute("SELECT biotools_category, COUNT(*) FROM grants WHERE biotools_category IS NOT NULL GROUP BY biotools_category ORDER BY COUNT(*) DESC")
-            by_category = cursor.fetchall()
-        except sqlite3.OperationalError:
-            by_category = []
-        
         conn.close()
-        return total, by_agency, by_category
+        return total, by_agency
     
     def run_scraper(self):
-        """Run comprehensive life science tools scraper"""
-        print("🧬 Starting Comprehensive Life Science Tools Scraper")
-        print("=" * 60)
-        print("🎯 Searching for ALL types of biotools:")
-        for category in self.biotools_categories.keys():
-            print(f"   • {category.replace('_', ' ').title()}")
-        print("=" * 60)
+        """Run the fixed scraper"""
+        print("🚀 Starting Fixed Life Science Tools Scraper")
+        print("=" * 50)
         
-        before_total, _, _ = self.get_stats()
+        before_total, _ = self.get_stats()
         print(f"📊 Current database: {before_total} grants")
         
         total_added = 0
         
-        # Fetch NSF grants
+        # Test NSF API first
         print("\n" + "="*40)
-        try:
-            nsf_grants = self.fetch_nsf_grants()
-            total_added += self.save_grants(nsf_grants, "NSF")
-        except Exception as e:
-            print(f"❌ NSF scraping failed: {e}")
+        nsf_working = self.test_nsf_api()
         
-        # Fetch NIH grants
+        if nsf_working:
+            try:
+                nsf_grants = self.fetch_nsf_grants_fixed()
+                total_added += self.save_grants(nsf_grants, "NSF")
+            except Exception as e:
+                print(f"❌ NSF scraping failed: {e}")
+        else:
+            print("⚠️ Skipping NSF due to API issues")
+        
+        # Focus on NIH since it's working
         print("\n" + "="*40)
         try:
-            nih_grants = self.fetch_nih_grants()
+            nih_grants = self.fetch_nih_grants_expanded()
             total_added += self.save_grants(nih_grants, "NIH")
         except Exception as e:
             print(f"❌ NIH scraping failed: {e}")
         
         # Final results
-        print("\n" + "="*60)
-        after_total, by_agency, by_category = self.get_stats()
+        print("\n" + "="*50)
+        after_total, by_agency = self.get_stats()
         
         print(f"📈 Final database: {after_total} grants (+{after_total - before_total})")
-        
         print("\n📊 Grants by agency:")
         for agency, count in by_agency:
             print(f"   {agency}: {count}")
         
-        if by_category:
-            print("\n🔬 Grants by biotools category:")
-            for category, count in by_category:
-                print(f"   {category.replace('_', ' ').title()}: {count}")
+        print(f"\n✅ Added {total_added} new grants this run")
         
-        print(f"\n✅ Added {total_added} new life science tool grants")
+        if total_added > 0:
+            print("🎉 Success! Database expanded with real life science tool grants")
         
         return total_added
 
 def main():
-    scraper = ComprehensiveBiotoolsScraper()
+    scraper = FixedScraper()
     scraper.run_scraper()
 
 if __name__ == "__main__":
