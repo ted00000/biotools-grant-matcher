@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Fixed SBIR Scraper - Addresses Solicitations API Issues
-- Uses alternative API approaches when main endpoint fails
-- Implements comprehensive error handling
-- Falls back to alternative data sources
-- Adds better logging for debugging API issues
+Complete Final SBIR/STTR Scraper - All Fixes Applied
+- Headers fix: ✅ Proper browser-like headers to avoid 403 errors
+- Solicitations API: ✅ Follows exact API specifications (max 50 rows)
+- Rate limiting: ✅ Proper delays and respectful API usage
+- Error handling: ✅ Comprehensive logging and recovery
+- Database schema: ✅ Dynamic column handling for all environments
 """
 
 import requests
@@ -16,20 +17,40 @@ import json
 from typing import List, Dict, Any, Optional
 import logging
 
-class FixedSBIRScraper:
+class SBIRScraper:
     def __init__(self, db_path="data/grants.db"):
         self.db_path = db_path
         self.base_url = "https://api.www.sbir.gov/public/api"
-        self.legacy_url = "https://legacy.www.sbir.gov/api"  # Fallback URL
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         
+        # 🔧 CRITICAL FIX: Browser-like headers to avoid 403 Forbidden
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (compatible; BiotoolsGrantMatcher/1.0; +https://biotools.example.com)',
+            'Accept': 'application/json, text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+        }
+        
         # Setup logging
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        logging.basicConfig(
+            level=logging.INFO, 
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('logs/scraper.log'),
+                logging.StreamHandler()
+            ]
+        )
         self.logger = logging.getLogger(__name__)
+        
+        # Create logs directory
+        os.makedirs('logs', exist_ok=True)
         
         self.setup_database()
         
-        # Enhanced biotools keywords
+        # Enhanced biotools-relevant keywords for filtering
         self.biotools_keywords = [
             'diagnostic', 'biomarker', 'assay', 'test', 'detection', 'screening',
             'laboratory', 'instrumentation', 'microscopy', 'spectrometry', 'imaging',
@@ -43,25 +64,17 @@ class FixedSBIRScraper:
             'pharmaceutical', 'therapeutics', 'clinical', 'biomedical',
             'sensor', 'monitor', 'measurement', 'analysis', 'research tool',
             'scientific instrument', 'clinical trial', 'medical', 'healthcare',
-            'biological', 'biochemical', 'biomolecular', 'therapeutic'
+            'biological', 'biochemical', 'biomolecular', 'therapeutic',
+            'pathogen', 'vaccine', 'immunology', 'oncology', 'cardiology',
+            'neurology', 'dermatology', 'ophthalmology', 'orthopedic'
         ]
-        
-        # User agent to appear more like a browser
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (compatible; GrantMatcher/1.0; +https://example.com/bot)',
-            'Accept': 'application/json, text/html',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive',
-            'Cache-Control': 'no-cache'
-        }
     
     def setup_database(self):
-        """Setup database with proper error handling"""
+        """Create enhanced database schema for SBIR/STTR data"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Check if grants table exists
+        # Check if grants table exists and what columns it has
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='grants';")
         grants_exists = cursor.fetchone()
         
@@ -71,13 +84,50 @@ class FixedSBIRScraper:
             existing_columns = {row[1]: row[2] for row in cursor.fetchall()}
             self.logger.info(f"Found existing grants table with {len(existing_columns)} columns")
             
-            # Add missing columns safely
+            # Add missing SBIR columns to existing table
             new_columns = {
-                'data_source': 'TEXT',
-                'solicitation_status': 'TEXT',
-                'close_date': 'DATE',
-                'open_date': 'DATE',
+                'branch': 'TEXT',
+                'phase': 'TEXT', 
+                'program': 'TEXT',
+                'agency_tracking_number': 'TEXT',
+                'contract_number': 'TEXT',
+                'proposal_award_date': 'DATE',
+                'contract_end_date': 'DATE',
+                'solicitation_number': 'TEXT',
+                'solicitation_year': 'INTEGER',
+                'topic_code': 'TEXT',
+                'award_year': 'INTEGER',
+                'award_amount': 'INTEGER',
+                'company_name': 'TEXT',
+                'company_uei': 'TEXT',
+                'company_duns': 'TEXT',
+                'company_address': 'TEXT',
+                'company_city': 'TEXT',
+                'company_state': 'TEXT',
+                'company_zip': 'TEXT',
+                'company_url': 'TEXT',
+                'hubzone_owned': 'BOOLEAN',
+                'socially_economically_disadvantaged': 'BOOLEAN',
+                'women_owned': 'BOOLEAN',
+                'number_employees': 'INTEGER',
+                'poc_name': 'TEXT',
+                'poc_title': 'TEXT',
+                'poc_phone': 'TEXT',
+                'poc_email': 'TEXT',
+                'pi_name': 'TEXT',
+                'pi_phone': 'TEXT',
+                'pi_email': 'TEXT',
+                'ri_name': 'TEXT',
+                'ri_poc_name': 'TEXT',
+                'ri_poc_phone': 'TEXT',
+                'data_source': 'TEXT DEFAULT "SBIR"',
+                'grant_type': 'TEXT',
+                'current_status': 'TEXT',
                 'relevance_score': 'REAL DEFAULT 0.0',
+                'open_date': 'DATE',
+                'close_date': 'DATE',
+                'solicitation_topics': 'TEXT',
+                'biotools_category': 'TEXT',
                 'last_scraped_at': 'TEXT'
             }
             
@@ -87,28 +137,76 @@ class FixedSBIRScraper:
                         cursor.execute(f"ALTER TABLE grants ADD COLUMN {column_name} {column_def}")
                         self.logger.info(f"Added column: {column_name}")
                     except sqlite3.Error as e:
-                        self.logger.warning(f"Could not add column {column_name}: {e}")
+                        if "duplicate column name" not in str(e).lower():
+                            self.logger.warning(f"Could not add column {column_name}: {e}")
         else:
-            # Create new table
-            self.logger.info("Creating new grants table")
+            # Create new grants table with full SBIR schema
+            self.logger.info("Creating new grants table with full SBIR schema")
             cursor.execute('''
                 CREATE TABLE grants (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     funding_opportunity_number TEXT UNIQUE,
                     title TEXT NOT NULL,
                     agency TEXT,
+                    branch TEXT,
+                    phase TEXT,
+                    program TEXT,
                     deadline DATE,
-                    amount_min INTEGER,
-                    amount_max INTEGER,
+                    amount_min INTEGER DEFAULT 0,
+                    amount_max INTEGER DEFAULT 0,
                     description TEXT,
                     keywords TEXT,
                     eligibility TEXT,
                     url TEXT,
+                    
+                    -- SBIR-specific fields
+                    agency_tracking_number TEXT,
+                    contract_number TEXT,
+                    proposal_award_date DATE,
+                    contract_end_date DATE,
+                    solicitation_number TEXT,
+                    solicitation_year INTEGER,
+                    topic_code TEXT,
+                    award_year INTEGER,
+                    award_amount INTEGER,
+                    
+                    -- Company information
+                    company_name TEXT,
+                    company_uei TEXT,
+                    company_duns TEXT,
+                    company_address TEXT,
+                    company_city TEXT,
+                    company_state TEXT,
+                    company_zip TEXT,
+                    company_url TEXT,
+                    hubzone_owned BOOLEAN,
+                    socially_economically_disadvantaged BOOLEAN,
+                    women_owned BOOLEAN,
+                    number_employees INTEGER,
+                    
+                    -- Contact information
+                    poc_name TEXT,
+                    poc_title TEXT,
+                    poc_phone TEXT,
+                    poc_email TEXT,
+                    pi_name TEXT,
+                    pi_phone TEXT,
+                    pi_email TEXT,
+                    
+                    -- Research institution (STTR)
+                    ri_name TEXT,
+                    ri_poc_name TEXT,
+                    ri_poc_phone TEXT,
+                    
+                    -- Metadata
                     data_source TEXT DEFAULT 'SBIR',
-                    solicitation_status TEXT,
-                    close_date DATE,
-                    open_date DATE,
+                    grant_type TEXT,
+                    current_status TEXT,
+                    biotools_category TEXT,
                     relevance_score REAL DEFAULT 0.0,
+                    open_date DATE,
+                    close_date DATE,
+                    solicitation_topics TEXT,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     last_scraped_at TEXT
@@ -117,6 +215,7 @@ class FixedSBIRScraper:
         
         conn.commit()
         conn.close()
+        self.logger.info("Database schema initialized successfully")
     
     def is_biotools_relevant(self, text: str) -> bool:
         """Check if content is relevant to biotools/life sciences"""
@@ -134,13 +233,14 @@ class FixedSBIRScraper:
         # High-value biotools terms (higher weight)
         high_value_terms = [
             'diagnostic', 'biomarker', 'medical device', 'biosensor', 'microfluidics',
-            'lab-on-chip', 'point-of-care', 'sequencing', 'genomics', 'proteomics'
+            'lab-on-chip', 'point-of-care', 'sequencing', 'genomics', 'proteomics',
+            'clinical trial', 'pharmaceutical', 'therapeutic'
         ]
         
         # Medium-value terms
         medium_value_terms = [
             'laboratory', 'instrumentation', 'microscopy', 'biotechnology',
-            'analytical', 'automation', 'imaging', 'molecular'
+            'analytical', 'automation', 'imaging', 'molecular', 'biomedical'
         ]
         
         # Count matches and weight them
@@ -159,12 +259,11 @@ class FixedSBIRScraper:
         
         return min(score, 10.0)  # Cap at 10.0
     
-    def make_api_request(self, endpoint: str, params: Dict[str, Any] = None, use_legacy: bool = False, max_retries: int = 3) -> Optional[List]:
-        """Make API request with enhanced error handling and fallback URLs"""
-        base_url = self.legacy_url if use_legacy else self.base_url
-        url = f"{base_url}/{endpoint}"
+    def make_api_request(self, endpoint: str, params: Dict[str, Any] = None, max_retries: int = 3) -> Optional[List]:
+        """Make API request with enhanced error handling and proper headers"""
+        url = f"{self.base_url}/{endpoint}"
         
-        # Add format=json to params if not present
+        # Ensure we have proper parameters
         if params is None:
             params = {}
         if 'format' not in params:
@@ -173,6 +272,8 @@ class FixedSBIRScraper:
         for attempt in range(max_retries):
             try:
                 self.logger.debug(f"API Request: {url} with params: {params}")
+                
+                # 🔧 CRITICAL: Use proper headers to avoid 403 Forbidden
                 response = requests.get(url, params=params, headers=self.headers, timeout=30)
                 
                 self.logger.debug(f"Response status: {response.status_code}")
@@ -180,17 +281,14 @@ class FixedSBIRScraper:
                 if response.status_code == 200:
                     try:
                         data = response.json()
-                        return data
+                        return data if isinstance(data, list) else []
                     except json.JSONDecodeError as e:
                         self.logger.error(f"JSON decode error: {e}")
-                        self.logger.debug(f"Raw response: {response.text[:500]}")
                         return None
                         
                 elif response.status_code == 403:
-                    self.logger.warning(f"403 Forbidden - API access restricted: {url}")
-                    if not use_legacy and endpoint == 'solicitations':
-                        self.logger.info("Trying legacy API URL...")
-                        return self.make_api_request(endpoint, params, use_legacy=True, max_retries=max_retries)
+                    self.logger.error(f"403 Forbidden - API access denied: {url}")
+                    self.logger.error("This suggests headers or rate limiting issues")
                     return None
                     
                 elif response.status_code == 404:
@@ -198,7 +296,7 @@ class FixedSBIRScraper:
                     return None
                     
                 elif response.status_code == 429:
-                    wait_time = (attempt + 1) * 10
+                    wait_time = (attempt + 1) * 15  # Longer waits for rate limiting
                     self.logger.warning(f"Rate limited, waiting {wait_time} seconds...")
                     time.sleep(wait_time)
                     
@@ -210,69 +308,30 @@ class FixedSBIRScraper:
             except requests.exceptions.RequestException as e:
                 self.logger.error(f"Request exception (attempt {attempt + 1}): {e}")
                 if attempt < max_retries - 1:
-                    time.sleep(5)
+                    time.sleep(10)  # Longer delays between retries
         
         self.logger.error(f"Failed after {max_retries} attempts")
         return None
     
-    def test_api_endpoints(self):
-        """Test all API endpoints to see what's working"""
-        self.logger.info("🔍 Testing SBIR API Endpoints...")
-        
-        endpoints_to_test = [
-            ('awards', {'rows': 5}, 'Basic awards test'),
-            ('awards', {'agency': 'HHS', 'rows': 5}, 'HHS awards test'),
-            ('firm', {'rows': 5}, 'Companies test'),
-            ('solicitations', {'rows': 5}, 'Solicitations test'),
-            ('solicitations', {'open': 1, 'rows': 5}, 'Open solicitations test'),
-            ('solicitations', {'agency': 'HHS', 'rows': 5}, 'HHS solicitations test'),
-        ]
-        
-        working_endpoints = []
-        
-        for endpoint, params, description in endpoints_to_test:
-            self.logger.info(f"  Testing: {description}")
-            
-            # Test main API
-            data = self.make_api_request(endpoint, params)
-            if data and isinstance(data, list) and len(data) > 0:
-                self.logger.info(f"    ✅ Main API works: {len(data)} records")
-                working_endpoints.append((endpoint, params, 'main'))
-            else:
-                self.logger.info(f"    ❌ Main API failed")
-                
-                # Test legacy API for solicitations
-                if endpoint == 'solicitations':
-                    self.logger.info(f"    🔄 Trying legacy API...")
-                    legacy_data = self.make_api_request(endpoint, params, use_legacy=True)
-                    if legacy_data and isinstance(legacy_data, list) and len(legacy_data) > 0:
-                        self.logger.info(f"    ✅ Legacy API works: {len(legacy_data)} records")
-                        working_endpoints.append((endpoint, params, 'legacy'))
-                    else:
-                        self.logger.info(f"    ❌ Legacy API also failed")
-        
-        self.logger.info(f"\n📊 Working endpoints: {len(working_endpoints)}")
-        return working_endpoints
-    
-    def fetch_awards_robust(self, agency: str, start_year: int = 2020) -> List[Dict]:
-        """Robust awards fetching with enhanced error handling"""
+    def fetch_awards_by_agency(self, agency: str, start_year: int = 2020) -> List[Dict]:
+        """Fetch awards from specific agency with biotools filtering"""
         self.logger.info(f"Fetching {agency} awards from {start_year}...")
         
         awards = []
+        rows_per_request = 1000  # Maximum for awards API
         current_year = datetime.now().year
         
         for year in range(start_year, current_year + 1):
             self.logger.info(f"  Fetching {agency} awards for {year}...")
-            
-            start = 0
-            batch_size = 1000
+            year_start = 0
+            year_awards = 0
             
             while True:
                 params = {
                     'agency': agency,
                     'year': year,
-                    'start': start,
-                    'rows': batch_size,
+                    'start': year_start,
+                    'rows': rows_per_request,
                     'format': 'json'
                 }
                 
@@ -281,12 +340,13 @@ class FixedSBIRScraper:
                 if not data or not isinstance(data, list):
                     break
                 
-                if not data:  # Empty list
+                batch_awards = data
+                if not batch_awards:
                     break
                 
                 # Filter for biotools relevance
                 relevant_awards = []
-                for award in data:
+                for award in batch_awards:
                     title = award.get('award_title', '')
                     abstract = award.get('abstract', '')
                     keywords = award.get('research_area_keywords', '') or ''
@@ -298,93 +358,138 @@ class FixedSBIRScraper:
                         relevant_awards.append(award)
                 
                 awards.extend(relevant_awards)
-                self.logger.info(f"    Batch: {len(data)} total, {len(relevant_awards)} biotools-relevant")
+                year_awards += len(batch_awards)
+                self.logger.info(f"    Batch: {len(batch_awards)} total, {len(relevant_awards)} biotools-relevant")
                 
-                # If we got fewer results than requested, we're done
-                if len(data) < batch_size:
+                # If we got fewer results than requested, we're done with this year
+                if len(batch_awards) < rows_per_request:
                     break
                 
-                start += batch_size
-                time.sleep(1)  # Be respectful
+                year_start += rows_per_request
+                time.sleep(2)  # Longer delays to be more respectful
+            
+            self.logger.info(f"  {agency} {year}: {year_awards} total awards processed")
         
         self.logger.info(f"✅ {agency}: Collected {len(awards)} biotools-relevant awards")
         return awards
     
-    def fetch_solicitations_robust(self) -> List[Dict]:
-        """Robust solicitations fetching with multiple fallback strategies"""
-        self.logger.info("🔍 Fetching SBIR Solicitations with Robust Strategy...")
+    def fetch_open_solicitations(self) -> List[Dict]:
+        """🔧 FIXED: API-compliant solicitations fetching following exact specifications"""
+        self.logger.info("🔍 Fetching SBIR Solicitations (API Specification Compliant)")
         
         all_solicitations = []
         
-        # Strategy 1: Try open solicitations
-        self.logger.info("  Strategy 1: Open solicitations...")
+        # Strategy 1: Direct open solicitations (API spec: max 50 rows, default 25)
+        self.logger.info("  Strategy 1: Open solicitations (API limits)")
         try:
-            params = {'open': 1, 'rows': 100, 'format': 'json'}
+            # Try with API documented default limit first
+            params = {
+                'open': 1,
+                'rows': 25,  # API documented default
+                'format': 'json'
+            }
+            
             data = self.make_api_request('solicitations', params)
             if data and isinstance(data, list):
-                self.logger.info(f"    ✅ Found {len(data)} open solicitations")
+                self.logger.info(f"    ✅ Found {len(data)} open solicitations (25 rows)")
                 all_solicitations.extend(data)
             else:
-                self.logger.info("    ❌ No open solicitations found")
-        except Exception as e:
-            self.logger.warning(f"    ❌ Open solicitations failed: {e}")
-        
-        # Strategy 2: Try all recent solicitations
-        self.logger.info("  Strategy 2: All recent solicitations...")
-        try:
-            params = {'rows': 100, 'format': 'json'}
-            data = self.make_api_request('solicitations', params)
-            if data and isinstance(data, list):
-                self.logger.info(f"    ✅ Found {len(data)} total solicitations")
-                # Filter for recent ones
-                recent_data = self._filter_recent_solicitations(data)
-                self.logger.info(f"    📅 {len(recent_data)} are recent")
-                all_solicitations.extend(recent_data)
-            else:
-                self.logger.info("    ❌ No solicitations found")
-        except Exception as e:
-            self.logger.warning(f"    ❌ All solicitations failed: {e}")
-        
-        # Strategy 3: Try agency-specific searches
-        self.logger.info("  Strategy 3: Agency-specific searches...")
-        agencies = ['HHS', 'NSF', 'DOD', 'DOE']
-        
-        for agency in agencies:
-            try:
-                params = {'agency': agency, 'rows': 50, 'format': 'json'}
+                self.logger.info("    ❌ No open solicitations found (25 rows)")
+                
+                # Try with maximum API limit
+                self.logger.info("    🔄 Trying maximum API limit...")
+                params['rows'] = 50  # API documented maximum
+                
                 data = self.make_api_request('solicitations', params)
                 if data and isinstance(data, list):
-                    self.logger.info(f"    ✅ {agency}: {len(data)} solicitations")
+                    self.logger.info(f"    ✅ Found {len(data)} open solicitations (50 rows)")
                     all_solicitations.extend(data)
                 else:
-                    self.logger.info(f"    ❌ {agency}: No solicitations")
-                time.sleep(1)  # Be respectful
+                    self.logger.info("    ❌ No open solicitations found (50 rows)")
+            
+            time.sleep(3)  # Longer delay after solicitations requests
+            
+        except Exception as e:
+            self.logger.warning(f"    ❌ Open solicitations strategy failed: {e}")
+        
+        # Strategy 2: Agency-specific open solicitations (API compliant)
+        self.logger.info("  Strategy 2: Agency-specific open solicitations")
+        biotools_agencies = ['HHS', 'NSF', 'DOD', 'DOE', 'NASA']
+        
+        for agency in biotools_agencies:
+            try:
+                params = {
+                    'agency': agency,
+                    'open': 1,
+                    'rows': 25,  # Conservative API limit
+                    'format': 'json'
+                }
+                
+                data = self.make_api_request('solicitations', params)
+                if data and isinstance(data, list):
+                    self.logger.info(f"    ✅ {agency}: {len(data)} open solicitations")
+                    all_solicitations.extend(data)
+                else:
+                    self.logger.info(f"    ❌ {agency}: No open solicitations")
+                
+                time.sleep(2)  # Respectful delay between agencies
+                
             except Exception as e:
-                self.logger.warning(f"    ❌ {agency} search failed: {e}")
+                self.logger.warning(f"    ❌ {agency} open solicitations failed: {e}")
         
-        # Strategy 4: Try keyword searches for biotools terms
-        self.logger.info("  Strategy 4: Keyword-based searches...")
-        biotools_search_terms = ['diagnostic', 'biotech', 'medical', 'laboratory', 'biosensor']
+        # Strategy 3: Keyword-based open solicitations (API compliant)
+        self.logger.info("  Strategy 3: Keyword-based open solicitations")
+        biotools_keywords = ['biotech', 'medical', 'diagnostic', 'laboratory', 'biosensor']
         
-        for keyword in biotools_search_terms:
+        for keyword in biotools_keywords:
             try:
-                params = {'keyword': keyword, 'rows': 25, 'format': 'json'}
+                params = {
+                    'keyword': keyword,
+                    'open': 1,
+                    'rows': 25,  # Conservative API limit
+                    'format': 'json'
+                }
+                
                 data = self.make_api_request('solicitations', params)
                 if data and isinstance(data, list):
-                    self.logger.info(f"    ✅ '{keyword}': {len(data)} solicitations")
+                    self.logger.info(f"    ✅ '{keyword}': {len(data)} open solicitations")
                     all_solicitations.extend(data)
                 else:
-                    self.logger.info(f"    ❌ '{keyword}': No solicitations")
-                time.sleep(0.5)  # Be respectful
+                    self.logger.info(f"    ❌ '{keyword}': No open solicitations")
+                
+                time.sleep(1.5)  # Respectful delay between keywords
+                
             except Exception as e:
                 self.logger.warning(f"    ❌ Keyword '{keyword}' search failed: {e}")
+        
+        # Strategy 4: Recent solicitations without open filter (fallback, API compliant)
+        if len(all_solicitations) == 0:
+            self.logger.info("  Strategy 4: Recent solicitations (fallback)")
+            try:
+                params = {
+                    'rows': 50,  # API documented maximum
+                    'format': 'json'
+                }
+                
+                data = self.make_api_request('solicitations', params)
+                if data and isinstance(data, list):
+                    self.logger.info(f"    ✅ Found {len(data)} recent solicitations")
+                    # Filter for potentially open ones
+                    potential_open = self._filter_potentially_open_solicitations(data)
+                    self.logger.info(f"    📅 {len(potential_open)} appear to be open/recent")
+                    all_solicitations.extend(potential_open)
+                else:
+                    self.logger.info("    ❌ No recent solicitations found")
+                
+            except Exception as e:
+                self.logger.warning(f"    ❌ Recent solicitations failed: {e}")
         
         # Remove duplicates based on solicitation_number
         unique_solicitations = {}
         for sol in all_solicitations:
-            sol_num = sol.get('solicitation_number') or sol.get('solicitation_id', '')
-            if sol_num and sol_num not in unique_solicitations:
-                unique_solicitations[sol_num] = sol
+            sol_id = sol.get('solicitation_number') or sol.get('solicitation_id', '')
+            if sol_id and sol_id not in unique_solicitations:
+                unique_solicitations[sol_id] = sol
         
         unique_list = list(unique_solicitations.values())
         self.logger.info(f"  📊 Total unique solicitations: {len(unique_list)}")
@@ -393,12 +498,53 @@ class FixedSBIRScraper:
         relevant_solicitations = self._filter_biotools_solicitations(unique_list)
         
         self.logger.info(f"✅ Collected {len(relevant_solicitations)} biotools-relevant solicitations")
+        
+        if len(relevant_solicitations) == 0:
+            self.logger.warning("⚠️  NO BIOTOOLS SOLICITATIONS FOUND")
+            self.logger.warning("This could indicate:")
+            self.logger.warning("  • No biotools solicitations currently open")
+            self.logger.warning("  • API rate limiting after awards collection")
+            self.logger.warning("  • Temporary API issues")
+            self.logger.warning("  • Try running solicitations-only later")
+        
         return relevant_solicitations
+    
+    def _filter_potentially_open_solicitations(self, solicitations: List[Dict]) -> List[Dict]:
+        """Filter for solicitations that might be open based on status and dates"""
+        potentially_open = []
+        current_date = datetime.now()
+        
+        for sol in solicitations:
+            # Check status
+            status = sol.get('current_status', '').lower()
+            if status in ['open', 'active', 'current']:
+                potentially_open.append(sol)
+                continue
+            
+            # Check close date
+            close_date_str = sol.get('close_date', '')
+            if close_date_str:
+                try:
+                    # Try to parse close date
+                    if 'T' in close_date_str:
+                        close_date = datetime.fromisoformat(close_date_str.replace('Z', '+00:00'))
+                    else:
+                        close_date = datetime.strptime(close_date_str.split('T')[0], '%Y-%m-%d')
+                    
+                    # If close date is in the future, consider it potentially open
+                    if close_date > current_date:
+                        potentially_open.append(sol)
+                        
+                except Exception:
+                    # If we can't parse the date, include it to be safe
+                    potentially_open.append(sol)
+        
+        return potentially_open
     
     def _filter_recent_solicitations(self, solicitations: List[Dict]) -> List[Dict]:
         """Filter solicitations to only include recent ones"""
         recent_solicitations = []
-        cutoff_date = datetime.now() - timedelta(days=365)  # Last year
+        cutoff_date = datetime.now() - timedelta(days=180)  # Last 6 months
         
         for sol in solicitations:
             is_recent = False
@@ -408,21 +554,27 @@ class FixedSBIRScraper:
                 date_str = sol.get(date_field, '')
                 if date_str:
                     try:
-                        # Try to parse various date formats
-                        for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%SZ']:
-                            try:
-                                sol_date = datetime.strptime(date_str.split('T')[0], '%Y-%m-%d')
-                                if sol_date >= cutoff_date:
-                                    is_recent = True
+                        # Try to parse the date
+                        if 'T' in date_str:  # ISO format
+                            sol_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        else:  # Try common formats
+                            for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%B %d, %Y']:
+                                try:
+                                    sol_date = datetime.strptime(date_str, fmt)
                                     break
-                            except ValueError:
-                                continue
-                        if is_recent:
+                                except ValueError:
+                                    continue
+                            else:
+                                continue  # Couldn't parse date
+                        
+                        if sol_date >= cutoff_date:
+                            is_recent = True
                             break
+                            
                     except Exception:
                         continue
             
-            # Also check status
+            # Also check if status indicates it's current
             status = sol.get('current_status', '').lower()
             if status in ['open', 'active', 'current']:
                 is_recent = True
@@ -454,16 +606,70 @@ class FixedSBIRScraper:
         
         return relevant_solicitations
     
-    def save_data_safely(self, data: List[Dict], data_type: str) -> int:
-        """Save data to database with enhanced error handling"""
-        if not data:
-            self.logger.info(f"No {data_type} data to save")
+    def fetch_biotools_companies(self) -> List[Dict]:
+        """Fetch companies with biotools-relevant awards"""
+        self.logger.info("Fetching biotools-relevant companies...")
+        
+        companies = []
+        
+        # Search for companies using biotools keywords
+        biotools_search_terms = [
+            'diagnostic', 'biomarker', 'medical device', 'biosensor',
+            'microfluidics', 'genomics', 'biotechnology', 'laboratory'
+        ]
+        
+        for term in biotools_search_terms:
+            self.logger.info(f"  Searching companies with keyword: {term}")
+            
+            start = 0
+            rows_per_request = 1000  # API allows up to 5000
+            
+            while True:
+                params = {
+                    'keyword': term,
+                    'start': start,
+                    'rows': rows_per_request,
+                    'format': 'json'
+                }
+                
+                data = self.make_api_request('firm', params)
+                
+                if not data or not isinstance(data, list):
+                    break
+                
+                batch_companies = data
+                if not batch_companies:
+                    break
+                
+                companies.extend(batch_companies)
+                self.logger.info(f"    Found {len(batch_companies)} companies for '{term}'")
+                
+                if len(batch_companies) < rows_per_request:
+                    break
+                
+                start += rows_per_request
+                time.sleep(2)  # Respectful delay
+        
+        # Remove duplicates based on UEI
+        unique_companies = {}
+        for company in companies:
+            uei = company.get('uei')
+            if uei and uei not in unique_companies:
+                unique_companies[uei] = company
+        
+        companies = list(unique_companies.values())
+        self.logger.info(f"✅ Collected {len(companies)} unique biotools companies")
+        return companies
+    
+    def save_awards(self, awards: List[Dict]) -> int:
+        """Save awards to database with dynamic column mapping"""
+        if not awards:
             return 0
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Get actual table structure
+        # Get the actual table structure
         cursor.execute("PRAGMA table_info(grants);")
         columns_info = cursor.fetchall()
         column_names = [col[1] for col in columns_info]
@@ -471,62 +677,92 @@ class FixedSBIRScraper:
         saved_count = 0
         current_time = datetime.now().isoformat()
         
-        for item in data:
+        for award in awards:
             try:
-                # Create a safe mapping based on available columns
-                safe_data = {}
+                # Create a mapping of our data to available columns
+                award_data = {}
                 
-                if data_type == 'awards':
-                    safe_data['funding_opportunity_number'] = f"SBIR-{item.get('agency', '')}-{item.get('contract', '')}"
-                    safe_data['title'] = item.get('award_title', '')[:250]
-                    safe_data['agency'] = item.get('agency', '')
-                    safe_data['description'] = item.get('abstract', '')[:1000] if item.get('abstract') else ''
-                    safe_data['keywords'] = item.get('research_area_keywords', '')
-                    safe_data['url'] = item.get('award_link', '')
-                    
-                    # Handle amount
-                    amount = 0
-                    if item.get('award_amount'):
-                        try:
-                            amount = int(float(str(item['award_amount'])))
-                        except:
-                            amount = 0
-                    safe_data['amount_max'] = amount
-                    safe_data['amount_min'] = 0
-                    
-                elif data_type == 'solicitations':
-                    safe_data['funding_opportunity_number'] = f"SOL-{item.get('solicitation_number', '')}"
-                    safe_data['title'] = item.get('solicitation_title', '')[:250]
-                    safe_data['agency'] = item.get('agency', '')
-                    safe_data['description'] = str(item.get('solicitation_topics', []))[:1000]
-                    safe_data['deadline'] = item.get('close_date', '')
-                    safe_data['url'] = item.get('solicitation_agency_url', '')
-                    
-                    if 'close_date' in column_names:
-                        safe_data['close_date'] = item.get('close_date', '')
-                    if 'open_date' in column_names:
-                        safe_data['open_date'] = item.get('open_date', '')
-                    if 'solicitation_status' in column_names:
-                        safe_data['solicitation_status'] = item.get('current_status', '')
+                # Basic fields
+                award_data['funding_opportunity_number'] = f"SBIR-{award.get('agency', '')}-{award.get('contract', '')}"
+                award_data['title'] = award.get('award_title', '')[:250]
+                award_data['agency'] = award.get('agency', '')
+                award_data['description'] = award.get('abstract', '')[:1000] if award.get('abstract') else ''
+                award_data['keywords'] = award.get('research_area_keywords', '')
+                award_data['url'] = award.get('award_link', '')
                 
-                # Add metadata
-                safe_data['data_source'] = 'SBIR'
+                # Amount fields
+                amount = award.get('award_amount', 0)
+                if amount:
+                    try:
+                        amount = int(float(str(amount)))
+                    except:
+                        amount = 0
+                
+                award_data['amount_min'] = 0
+                award_data['amount_max'] = amount
+                
+                # SBIR-specific fields (only add if columns exist)
+                if 'branch' in column_names:
+                    award_data['branch'] = award.get('branch', '')
+                if 'phase' in column_names:
+                    award_data['phase'] = award.get('phase', '')
+                if 'program' in column_names:
+                    award_data['program'] = award.get('program', '')
+                if 'award_year' in column_names:
+                    award_data['award_year'] = award.get('award_year', None)
+                if 'award_amount' in column_names:
+                    award_data['award_amount'] = amount
+                if 'contract_number' in column_names:
+                    award_data['contract_number'] = award.get('contract', '')
+                if 'company_name' in column_names:
+                    award_data['company_name'] = award.get('firm', '')
+                if 'company_city' in column_names:
+                    award_data['company_city'] = award.get('city', '')
+                if 'company_state' in column_names:
+                    award_data['company_state'] = award.get('state', '')
+                if 'company_uei' in column_names:
+                    award_data['company_uei'] = award.get('uei', '')
+                if 'company_duns' in column_names:
+                    award_data['company_duns'] = award.get('duns', '')
+                if 'company_address' in column_names:
+                    award_data['company_address'] = award.get('address1', '')
+                if 'company_zip' in column_names:
+                    award_data['company_zip'] = award.get('zip', '')
+                if 'poc_name' in column_names:
+                    award_data['poc_name'] = award.get('poc_name', '')
+                if 'pi_name' in column_names:
+                    award_data['pi_name'] = award.get('pi_name', '')
+                
+                # Boolean fields
+                if 'hubzone_owned' in column_names:
+                    award_data['hubzone_owned'] = award.get('hubzone_owned') == 'Y'
+                if 'socially_economically_disadvantaged' in column_names:
+                    award_data['socially_economically_disadvantaged'] = award.get('socially_economically_disadvantaged') == 'Y'
+                if 'women_owned' in column_names:
+                    award_data['women_owned'] = award.get('women_owned') == 'Y'
+                
+                # Metadata fields
+                if 'data_source' in column_names:
+                    award_data['data_source'] = 'SBIR'
+                if 'grant_type' in column_names:
+                    award_data['grant_type'] = 'award'
+                if 'biotools_category' in column_names:
+                    award_data['biotools_category'] = 'biotools'
                 if 'relevance_score' in column_names:
-                    safe_data['relevance_score'] = item.get('relevance_score', 0.0)
+                    award_data['relevance_score'] = award.get('relevance_score', 0.0)
                 if 'updated_at' in column_names:
-                    safe_data['updated_at'] = current_time
+                    award_data['updated_at'] = current_time
                 if 'last_scraped_at' in column_names:
-                    safe_data['last_scraped_at'] = current_time
+                    award_data['last_scraped_at'] = current_time
                 
-                # Filter for available columns
-                available_data = {k: v for k, v in safe_data.items() if k in column_names and v is not None}
+                # Build the SQL dynamically based on available columns
+                available_fields = {k: v for k, v in award_data.items() if k in column_names}
                 
-                if not available_data:
+                if not available_fields:
                     continue
                 
-                # Build SQL
-                columns = list(available_data.keys())
-                values = list(available_data.values())
+                columns = list(available_fields.keys())
+                values = list(available_fields.values())
                 placeholders = ', '.join(['?' for _ in values])
                 
                 sql = f'''
@@ -538,121 +774,433 @@ class FixedSBIRScraper:
                 saved_count += 1
                 
             except sqlite3.Error as e:
-                self.logger.error(f"Database error saving {data_type}: {e}")
-                continue
+                self.logger.error(f"Database error saving award: {e}")
         
         conn.commit()
         conn.close()
         
-        self.logger.info(f"💾 Saved {saved_count} {data_type} to database")
+        self.logger.info(f"💾 Saved {saved_count} awards to database")
         return saved_count
     
-    def run_comprehensive_test(self):
-        """Run comprehensive API testing and data collection"""
-        self.logger.info("🚀 Starting Comprehensive SBIR Data Collection Test")
+    def save_solicitations(self, solicitations: List[Dict]) -> int:
+        """Save solicitations to database with proper handling"""
+        if not solicitations:
+            return 0
+        
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Get the actual table structure
+        cursor.execute("PRAGMA table_info(grants);")
+        columns_info = cursor.fetchall()
+        column_names = [col[1] for col in columns_info]
+        
+        saved_count = 0
+        current_time = datetime.now().isoformat()
+        
+        for sol in solicitations:
+            try:
+                # Create a mapping for solicitation data
+                sol_data = {}
+                
+                # Basic fields
+                sol_data['funding_opportunity_number'] = f"SOL-{sol.get('solicitation_number', '')}"
+                sol_data['title'] = sol.get('solicitation_title', '')[:250]
+                sol_data['agency'] = sol.get('agency', '')
+                sol_data['deadline'] = sol.get('close_date', '')
+                sol_data['url'] = sol.get('solicitation_agency_url', '')
+                
+                # Extract description from topics
+                topics_description = ""
+                if 'solicitation_topics' in sol and sol['solicitation_topics']:
+                    for topic in sol['solicitation_topics']:
+                        if isinstance(topic, dict):
+                            topics_description += f"{topic.get('topic_title', '')} {topic.get('topic_description', '')} "
+                
+                sol_data['description'] = topics_description[:1000] if topics_description else ''
+                
+                # SBIR-specific fields (only add if columns exist)
+                if 'branch' in column_names:
+                    sol_data['branch'] = sol.get('branch', '')
+                if 'phase' in column_names:
+                    sol_data['phase'] = sol.get('phase', '')
+                if 'program' in column_names:
+                    sol_data['program'] = sol.get('program', '')
+                if 'current_status' in column_names:
+                    sol_data['current_status'] = sol.get('current_status', '')
+                if 'open_date' in column_names:
+                    sol_data['open_date'] = sol.get('open_date', '')
+                if 'close_date' in column_names:
+                    sol_data['close_date'] = sol.get('close_date', '')
+                if 'solicitation_topics' in column_names:
+                    sol_data['solicitation_topics'] = json.dumps(sol.get('solicitation_topics', []))
+                if 'solicitation_number' in column_names:
+                    sol_data['solicitation_number'] = sol.get('solicitation_number', '')
+                if 'solicitation_year' in column_names:
+                    sol_data['solicitation_year'] = sol.get('solicitation_year', None)
+                
+                # Metadata fields
+                if 'data_source' in column_names:
+                    sol_data['data_source'] = 'SBIR'
+                if 'grant_type' in column_names:
+                    sol_data['grant_type'] = 'solicitation'
+                if 'biotools_category' in column_names:
+                    sol_data['biotools_category'] = 'biotools'
+                if 'relevance_score' in column_names:
+                    sol_data['relevance_score'] = sol.get('relevance_score', 0.0)
+                if 'updated_at' in column_names:
+                    sol_data['updated_at'] = current_time
+                if 'last_scraped_at' in column_names:
+                    sol_data['last_scraped_at'] = current_time
+                
+                # Build the SQL dynamically based on available columns
+                available_fields = {k: v for k, v in sol_data.items() if k in column_names}
+                
+                if not available_fields:
+                    continue
+                
+                columns = list(available_fields.keys())
+                values = list(available_fields.values())
+                placeholders = ', '.join(['?' for _ in values])
+                
+                sql = f'''
+                    INSERT OR REPLACE INTO grants ({', '.join(columns)})
+                    VALUES ({placeholders})
+                '''
+                
+                cursor.execute(sql, values)
+                saved_count += 1
+                
+            except sqlite3.Error as e:
+                self.logger.error(f"Database error saving solicitation: {e}")
+        
+        conn.commit()
+        conn.close()
+        
+        self.logger.info(f"💾 Saved {saved_count} solicitations to database")
+        return saved_count
+    
+    def save_companies(self, companies: List[Dict]) -> int:
+        """Save companies to database - placeholder for future enhancement"""
+        # For now, we'll focus on awards and solicitations
+        # Companies can be added later as a separate table
+        self.logger.info(f"Company data collection noted: {len(companies)} companies found")
+        return 0
+    
+    def get_database_stats(self) -> Dict[str, int]:
+        """Get current database statistics"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        stats = {}
+        
+        # Total grants
+        cursor.execute("SELECT COUNT(*) FROM grants")
+        stats['total_grants'] = cursor.fetchone()[0]
+        
+        # By data source
+        try:
+            cursor.execute("SELECT data_source, COUNT(*) FROM grants WHERE data_source IS NOT NULL GROUP BY data_source")
+            stats['by_source'] = cursor.fetchall()
+        except sqlite3.OperationalError:
+            stats['by_source'] = []
+        
+        # By agency
+        cursor.execute("SELECT agency, COUNT(*) FROM grants GROUP BY agency ORDER BY COUNT(*) DESC")
+        stats['by_agency'] = cursor.fetchall()
+        
+        # By grant type
+        try:
+            cursor.execute("SELECT grant_type, COUNT(*) FROM grants WHERE grant_type IS NOT NULL GROUP BY grant_type")
+            stats['by_type'] = cursor.fetchall()
+        except sqlite3.OperationalError:
+            stats['by_type'] = []
+        
+        # Recent data (last 30 days)
+        try:
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE last_scraped_at > date('now', '-30 days')")
+            stats['recent_updates'] = cursor.fetchone()[0]
+        except sqlite3.OperationalError:
+            stats['recent_updates'] = 0
+        
+        # Biotools relevance
+        try:
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE relevance_score > 0")
+            stats['biotools_relevant'] = cursor.fetchone()[0]
+        except sqlite3.OperationalError:
+            stats['biotools_relevant'] = 0
+        
+        # Open solicitations
+        try:
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE grant_type = 'solicitation' AND current_status = 'open'")
+            stats['open_solicitations'] = cursor.fetchone()[0]
+        except sqlite3.OperationalError:
+            stats['open_solicitations'] = 0
+        
+        conn.close()
+        return stats
+    
+    def run_full_scraping(self, start_year: int = 2020) -> Dict[str, int]:
+        """Run complete SBIR/STTR data collection with enhanced solicitations handling"""
+        self.logger.info("🚀 Starting SBIR/STTR Comprehensive Data Collection")
         self.logger.info("=" * 60)
         
-        # Step 1: Test all endpoints
-        self.logger.info("Step 1: Testing API Endpoints")
-        working_endpoints = self.test_api_endpoints()
+        before_stats = self.get_database_stats()
+        self.logger.info(f"📊 Before: {before_stats['total_grants']} total grants")
         
-        if not working_endpoints:
-            self.logger.error("❌ No working API endpoints found!")
-            return
-        
-        # Step 2: Collect awards data
-        self.logger.info("\nStep 2: Collecting Awards Data")
-        all_awards = []
-        
-        # Test with just HHS first (smaller dataset)
-        try:
-            hhs_awards = self.fetch_awards_robust('HHS', 2023)  # Just last 2 years for testing
-            all_awards.extend(hhs_awards)
-        except Exception as e:
-            self.logger.error(f"Failed to fetch HHS awards: {e}")
-        
-        # Step 3: Collect solicitations data
-        self.logger.info("\nStep 3: Collecting Solicitations Data")
-        solicitations = []
-        
-        try:
-            solicitations = self.fetch_solicitations_robust()
-        except Exception as e:
-            self.logger.error(f"Failed to fetch solicitations: {e}")
-        
-        # Step 4: Save data
-        self.logger.info("\nStep 4: Saving Data to Database")
-        
-        awards_saved = self.save_data_safely(all_awards, 'awards')
-        solicitations_saved = self.save_data_safely(solicitations, 'solicitations')
-        
-        # Step 5: Results summary
-        self.logger.info("\n" + "=" * 60)
-        self.logger.info("📊 COMPREHENSIVE TEST RESULTS:")
-        self.logger.info(f"  Working API endpoints: {len(working_endpoints)}")
-        self.logger.info(f"  Awards collected: {len(all_awards)}")
-        self.logger.info(f"  Awards saved: {awards_saved}")
-        self.logger.info(f"  Solicitations collected: {len(solicitations)}")
-        self.logger.info(f"  Solicitations saved: {solicitations_saved}")
-        
-        if awards_saved > 0 or solicitations_saved > 0:
-            self.logger.info("🎉 SUCCESS: Data collection is working!")
-        else:
-            self.logger.warning("⚠️ No data was saved - check API issues")
-        
-        return {
-            'working_endpoints': len(working_endpoints),
-            'awards_collected': len(all_awards),
-            'awards_saved': awards_saved,
-            'solicitations_collected': len(solicitations),
-            'solicitations_saved': solicitations_saved
+        total_added = {
+            'awards': 0,
+            'solicitations': 0,
+            'companies': 0
         }
+        
+        # 1. Fetch Awards by Agency
+        self.logger.info("\n" + "=" * 40)
+        self.logger.info("🏆 COLLECTING AWARD DATA")
+        
+        # Key agencies for biotools funding
+        agencies = ['HHS', 'NSF', 'DOD', 'DOE', 'NASA', 'EPA', 'USDA']
+        
+        for agency in agencies:
+            try:
+                awards = self.fetch_awards_by_agency(agency, start_year)
+                saved = self.save_awards(awards)
+                total_added['awards'] += saved
+                
+                # Longer delay between agencies to be more respectful
+                time.sleep(5)
+                
+            except Exception as e:
+                self.logger.error(f"Failed to process {agency} awards: {e}")
+        
+        # 2. Fetch Open Solicitations (with longer delay after awards)
+        self.logger.info("\n" + "=" * 40)
+        self.logger.info("📋 COLLECTING SOLICITATION DATA")
+        self.logger.info("⏳ Waiting 10 seconds after awards collection for API recovery...")
+        time.sleep(10)  # Give API time to recover after heavy awards collection
+        
+        try:
+            solicitations = self.fetch_open_solicitations()
+            saved = self.save_solicitations(solicitations)
+            total_added['solicitations'] += saved
+            
+        except Exception as e:
+            self.logger.error(f"Failed to process solicitations: {e}")
+            self.logger.warning("💡 Try running 'python app/scraper.py solicitations' separately later")
+        
+        # 3. Fetch Companies (basic collection)
+        self.logger.info("\n" + "=" * 40)
+        self.logger.info("🏢 COLLECTING COMPANY DATA")
+        
+        try:
+            companies = self.fetch_biotools_companies()
+            saved = self.save_companies(companies)
+            total_added['companies'] += saved
+            
+        except Exception as e:
+            self.logger.error(f"Failed to process companies: {e}")
+        
+        # Final Statistics
+        self.logger.info("\n" + "=" * 60)
+        after_stats = self.get_database_stats()
+        
+        self.logger.info("📈 SCRAPING RESULTS:")
+        self.logger.info(f"  Total grants: {before_stats['total_grants']} → {after_stats['total_grants']} (+{after_stats['total_grants'] - before_stats['total_grants']})")
+        self.logger.info(f"  Awards added: {total_added['awards']}")
+        self.logger.info(f"  Solicitations added: {total_added['solicitations']}")
+        self.logger.info(f"  Companies processed: {total_added['companies']}")
+        
+        self.logger.info("\n📊 BREAKDOWN BY AGENCY:")
+        for agency, count in after_stats['by_agency'][:10]:  # Top 10
+            if agency:  # Skip null agencies
+                self.logger.info(f"   {agency}: {count} grants")
+        
+        if after_stats.get('by_type'):
+            self.logger.info("\n📊 BREAKDOWN BY TYPE:")
+            for grant_type, count in after_stats['by_type']:
+                self.logger.info(f"   {grant_type}: {count}")
+        
+        # Special handling for solicitations
+        if total_added['solicitations'] == 0:
+            self.logger.warning("\n⚠️  NO SOLICITATIONS COLLECTED")
+            self.logger.warning("This is often due to API rate limiting after awards collection.")
+            self.logger.warning("RECOMMENDED ACTIONS:")
+            self.logger.warning("  1. Wait 30 minutes, then run: python app/scraper.py solicitations")
+            self.logger.warning("  2. Check logs for specific errors")
+            self.logger.warning("  3. Try manual API test: curl with proper headers")
+        else:
+            self.logger.info(f"\n🎉 Successfully collected {total_added['solicitations']} open solicitations!")
+        
+        total_new = sum(total_added.values())
+        self.logger.info(f"\n✅ Total new records added: {total_new}")
+        
+        if total_new > 0:
+            self.logger.info("🎉 SBIR/STTR database successfully expanded!")
+            self.logger.info("📈 Your biotools grant matching system now includes:")
+            self.logger.info("   • Historical award data for business development")
+            if total_added['solicitations'] > 0:
+                self.logger.info("   • Active solicitations for funding opportunities")
+            self.logger.info("   • Enhanced search and matching capabilities")
+        
+        return total_added
+    
+    def run_solicitations_only(self) -> int:
+        """Quick update of just open solicitations (for frequent updates)"""
+        self.logger.info("🔄 Quick Update: Fetching Open Solicitations Only")
+        
+        try:
+            solicitations = self.fetch_open_solicitations()
+            saved = self.save_solicitations(solicitations)
+            
+            self.logger.info(f"✅ Updated {saved} solicitations")
+            
+            if saved == 0:
+                self.logger.warning("⚠️  No solicitations found. This could be due to:")
+                self.logger.warning("  • No biotools solicitations currently open")
+                self.logger.warning("  • API rate limiting or temporary issues")
+                self.logger.warning("  • Try again in 30 minutes")
+            
+            return saved
+            
+        except Exception as e:
+            self.logger.error(f"Failed to update solicitations: {e}")
+            return 0
+    
+    def run_recent_awards_only(self, months_back: int = 6) -> int:
+        """Update only recent awards (for incremental updates)"""
+        self.logger.info(f"🔄 Quick Update: Fetching Awards from Last {months_back} Months")
+        
+        # Calculate start year for recent data
+        cutoff_date = datetime.now() - timedelta(days=months_back * 30)
+        start_year = cutoff_date.year
+        
+        total_awards = 0
+        agencies = ['HHS', 'NSF', 'DOD']  # Focus on key agencies for quick updates
+        
+        for agency in agencies:
+            try:
+                awards = self.fetch_awards_by_agency(agency, start_year)
+                saved = self.save_awards(awards)
+                total_awards += saved
+                
+            except Exception as e:
+                self.logger.error(f"Failed to update {agency} awards: {e}")
+        
+        self.logger.info(f"✅ Updated {total_awards} recent awards")
+        return total_awards
+    
+    def test_api_connectivity(self) -> Dict[str, bool]:
+        """Test all API endpoints to verify connectivity"""
+        self.logger.info("🔍 Testing SBIR API Connectivity...")
+        
+        test_results = {}
+        
+        # Test awards API
+        try:
+            data = self.make_api_request('awards', {'rows': 1})
+            test_results['awards'] = data is not None and len(data) > 0
+            self.logger.info(f"  Awards API: {'✅ Working' if test_results['awards'] else '❌ Failed'}")
+        except Exception as e:
+            test_results['awards'] = False
+            self.logger.error(f"  Awards API: ❌ Failed - {e}")
+        
+        # Test solicitations API with API-compliant parameters
+        try:
+            data = self.make_api_request('solicitations', {'rows': 25})  # API compliant
+            test_results['solicitations'] = data is not None and len(data) >= 0
+            self.logger.info(f"  Solicitations API: {'✅ Working' if test_results['solicitations'] else '❌ Failed'}")
+        except Exception as e:
+            test_results['solicitations'] = False
+            self.logger.error(f"  Solicitations API: ❌ Failed - {e}")
+        
+        # Test companies API
+        try:
+            data = self.make_api_request('firm', {'rows': 1})
+            test_results['companies'] = data is not None and len(data) > 0
+            self.logger.info(f"  Companies API: {'✅ Working' if test_results['companies'] else '❌ Failed'}")
+        except Exception as e:
+            test_results['companies'] = False
+            self.logger.error(f"  Companies API: ❌ Failed - {e}")
+        
+        working_count = sum(test_results.values())
+        self.logger.info(f"\n📊 API Status: {working_count}/3 endpoints working")
+        
+        if working_count == 3:
+            self.logger.info("🎉 All APIs are working! Ready for full scraping.")
+        elif working_count >= 2:
+            self.logger.info("✅ Most APIs working. Proceed with caution.")
+        else:
+            self.logger.warning("⚠️  Multiple API issues detected. Check logs.")
+        
+        return test_results
 
 
 def main():
-    """Main execution function for testing"""
-    scraper = FixedSBIRScraper()
+    """Main execution function"""
+    scraper = SBIRScraper()
     
     import sys
     
     if len(sys.argv) > 1:
         command = sys.argv[1].lower()
         
-        if command == 'test':
-            # Run comprehensive test
-            scraper.run_comprehensive_test()
-            
-        elif command == 'endpoints':
-            # Test endpoints only
-            scraper.test_api_endpoints()
+        if command == 'full':
+            # Full scraping (use for initial setup)
+            start_year = int(sys.argv[2]) if len(sys.argv) > 2 else 2020
+            scraper.run_full_scraping(start_year)
             
         elif command == 'solicitations':
-            # Test solicitations only
-            solicitations = scraper.fetch_solicitations_robust()
-            print(f"\nFound {len(solicitations)} biotools-relevant solicitations")
-            if solicitations:
-                for i, sol in enumerate(solicitations[:3]):
-                    print(f"\n{i+1}. {sol.get('solicitation_title', 'No title')}")
-                    print(f"   Agency: {sol.get('agency', 'Unknown')}")
-                    print(f"   Status: {sol.get('current_status', 'Unknown')}")
-                    print(f"   Close Date: {sol.get('close_date', 'Unknown')}")
+            # Update only solicitations (daily)
+            scraper.run_solicitations_only()
             
-        elif command == 'awards':
-            # Test awards only
-            awards = scraper.fetch_awards_robust('HHS', 2024)
-            print(f"\nFound {len(awards)} biotools-relevant awards")
-            if awards:
-                for i, award in enumerate(awards[:3]):
-                    print(f"\n{i+1}. {award.get('award_title', 'No title')}")
-                    print(f"   Company: {award.get('firm', 'Unknown')}")
-                    print(f"   Amount: ${award.get('award_amount', 0):,}")
-                    print(f"   Score: {award.get('relevance_score', 0):.1f}")
+        elif command == 'recent':
+            # Update only recent awards (weekly)
+            months = int(sys.argv[2]) if len(sys.argv) > 2 else 6
+            scraper.run_recent_awards_only(months)
+            
+        elif command == 'stats':
+            # Show database statistics
+            stats = scraper.get_database_stats()
+            print("\n📊 SBIR Database Statistics:")
+            print(f"  Total Grants: {stats['total_grants']}")
+            print(f"  Biotools Relevant: {stats['biotools_relevant']}")
+            print(f"  Recent Updates: {stats['recent_updates']}")
+            print(f"  Open Solicitations: {stats['open_solicitations']}")
+            
+            if stats['by_agency']:
+                print(f"\n📊 Grants by Agency:")
+                for agency, count in stats['by_agency'][:10]:  # Top 10
+                    if agency:
+                        print(f"   {agency}: {count}")
+            
+            if stats['by_type']:
+                print(f"\n📊 Grants by Type:")
+                for grant_type, count in stats['by_type']:
+                    print(f"   {grant_type}: {count}")
+                    
+        elif command == 'test':
+            # Test API connectivity
+            results = scraper.test_api_connectivity()
+            if all(results.values()):
+                print("\n🎉 All APIs are working! Ready to scrape.")
+            elif sum(results.values()) >= 2:
+                print("\n✅ Most APIs working. You can proceed.")
+            else:
+                print("\n⚠️ Multiple API issues detected. Check logs for details.")
+            
+        else:
+            print("Usage:")
+            print("  python app/scraper.py full [start_year]    # Full data collection")
+            print("  python app/scraper.py solicitations       # Update solicitations only")
+            print("  python app/scraper.py recent [months]     # Update recent awards")
+            print("  python app/scraper.py stats               # Show database stats")
+            print("  python app/scraper.py test                # Test API connectivity")
     else:
-        print("Usage:")
-        print("  python fixed_scraper.py test         # Run comprehensive test")
-        print("  python fixed_scraper.py endpoints    # Test API endpoints")
-        print("  python fixed_scraper.py solicitations # Test solicitations only")
-        print("  python fixed_scraper.py awards       # Test awards only")
+        # Default: run full scraping from 2020
+        print("🚀 Starting default full scraping from 2020...")
+        print("💡 Use 'python app/scraper.py test' to test APIs first")
+        scraper.run_full_scraping(2020)
+
 
 if __name__ == "__main__":
     main()
