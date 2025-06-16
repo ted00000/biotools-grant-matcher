@@ -258,60 +258,60 @@ class SBIRScraper:
                 score += 1.0
         
         return min(score, 10.0)  # Cap at 10.0
-    
+
     def make_api_request(self, endpoint: str, params: Dict[str, Any] = None, max_retries: int = 3) -> Optional[List]:
-        """Make API request with enhanced error handling and proper headers"""
-        url = f"{self.base_url}/{endpoint}"
-        
-        # Ensure we have proper parameters
+        """Make API request with enhanced error handling and correct endpoint routing."""
+        # Determine URL and whether to use params
+        if endpoint == "solicitations":
+            url = "https://api.www.sbir.gov/public/api/solicitations"
+            use_params = False  # Drop all params for solicitations
+        else:
+            url = f"{self.base_url}/{endpoint}"
+            use_params = True
+
         if params is None:
             params = {}
-        if 'format' not in params:
-            params['format'] = 'json'
-        
+
         for attempt in range(max_retries):
             try:
-                self.logger.debug(f"API Request: {url} with params: {params}")
-                
-                # 🔧 CRITICAL: Use proper headers to avoid 403 Forbidden
-                response = requests.get(url, params=params, headers=self.headers, timeout=30)
-                
-                self.logger.debug(f"Response status: {response.status_code}")
-                
+                # Only pass params if allowed
+                response = requests.get(
+                    url,
+                    headers=self.headers,
+                    params=params if use_params else None,
+                    timeout=30
+                )
+                self.logger.debug(f"Requesting {response.url} → {response.status_code}")
+
                 if response.status_code == 200:
                     try:
                         data = response.json()
                         return data if isinstance(data, list) else []
                     except json.JSONDecodeError as e:
-                        self.logger.error(f"JSON decode error: {e}")
+                        self.logger.error("JSON decode error:", e)
                         return None
-                        
-                elif response.status_code == 403:
-                    self.logger.error(f"403 Forbidden - API access denied: {url}")
-                    self.logger.error("This suggests headers or rate limiting issues")
+
+                if response.status_code in (403, 404):
+                    self.logger.warning(f"{response.status_code} for {response.url}")
                     return None
-                    
-                elif response.status_code == 404:
-                    self.logger.warning(f"404 Not Found - endpoint may not exist: {url}")
-                    return None
-                    
-                elif response.status_code == 429:
-                    wait_time = (attempt + 1) * 15  # Longer waits for rate limiting
-                    self.logger.warning(f"Rate limited, waiting {wait_time} seconds...")
-                    time.sleep(wait_time)
-                    
-                else:
-                    self.logger.error(f"API request failed: {response.status_code}")
-                    self.logger.debug(f"Response content: {response.text[:200]}")
-                    return None
-                    
-            except requests.exceptions.RequestException as e:
-                self.logger.error(f"Request exception (attempt {attempt + 1}): {e}")
+
+                if response.status_code == 429:
+                    wait = (attempt + 1) * 15
+                    self.logger.warning(f"429 rate limit — retrying in {wait}s")
+                    time.sleep(wait)
+                    continue
+
+                self.logger.error(f"Unknown status {response.status_code} at {response.url}")
+                return None
+
+            except requests.RequestException as e:
+                self.logger.error(f"Request exception on attempt {attempt + 1}: {e}")
                 if attempt < max_retries - 1:
-                    time.sleep(10)  # Longer delays between retries
-        
-        self.logger.error(f"Failed after {max_retries} attempts")
+                    time.sleep(10)
+
+        self.logger.error("Max retries exceeded")
         return None
+
     
     def fetch_awards_by_agency(self, agency: str, start_year: int = 2020) -> List[Dict]:
         """Fetch awards from specific agency with biotools filtering"""
