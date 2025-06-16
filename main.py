@@ -532,37 +532,45 @@ def get_grant_details(grant_id):
 @app.route('/api/stats', methods=['GET'])
 @limiter.limit("20 per hour;2 per minute")
 def get_stats():
-    """Get database statistics"""
+    """Get database statistics - simplified version"""
     try:
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         
+        # Get total grants
         cursor.execute("SELECT COUNT(*) FROM grants")
         total_grants = cursor.fetchone()[0]
         
-        cursor.execute("SELECT COUNT(*) FROM grants WHERE updated_at > date('now', '-30 days')")
-        recent_grants = cursor.fetchone()[0]
+        # Get recent grants (last 30 days) - handle if updated_at column doesn't exist
+        try:
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE updated_at > date('now', '-30 days')")
+            recent_grants = cursor.fetchone()[0]
+        except sqlite3.OperationalError:
+            # If updated_at column doesn't exist, use total as recent
+            recent_grants = total_grants
         
+        # Get agencies
         cursor.execute("SELECT agency, COUNT(*) FROM grants GROUP BY agency ORDER BY COUNT(*) DESC LIMIT 10")
         agencies = cursor.fetchall()
-        
-        # Get search analytics
-        cursor.execute("SELECT COUNT(*) FROM search_history WHERE timestamp > datetime('now', '-7 days')")
-        recent_searches = cursor.fetchone()[0]
         
         conn.close()
         
         return jsonify({
             'total_grants': total_grants,
             'recent_grants': recent_grants,
-            'recent_searches': recent_searches,
             'agencies': [{'name': agency[0], 'count': agency[1]} for agency in agencies],
             'last_updated': datetime.now().isoformat()
         })
         
     except Exception as e:
         logger.error(f"Stats error: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({
+            'error': 'Internal server error',
+            'total_grants': 0,
+            'recent_grants': 0,
+            'agencies': [],
+            'last_updated': datetime.now().isoformat()
+        }), 500
 
 @app.route('/api/feedback', methods=['POST'])
 @limiter.limit("20 per hour;2 per minute")
