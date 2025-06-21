@@ -953,25 +953,28 @@
             resultsSection.style.display = 'block';
         }
 
-        function createResultCard(item, dataType) {
+       function createResultCard(item, dataType) {
             // Determine the actual item type from the data
             let itemType = dataType;
+            let displayType = item.display_type || dataType;
+            
             if (dataType === 'all') {
                 // Infer type from data structure
                 if (item.grant_type === 'solicitation' || item.solicitation_number) {
                     itemType = 'solicitations';
-                } else if (item.grant_type === 'award' || item.contract_number || item.award_year) {
-                    itemType = 'awards';
-                } else if (item.company_name || item.firm) {
+                } else if (item.display_type === 'company' || (dataType === 'companies')) {
                     itemType = 'companies';
                 } else {
                     itemType = 'awards'; // default
                 }
+            } else if (dataType === 'companies') {
+                itemType = 'companies';
+                displayType = 'company';
             }
 
             const cardClass = `grant-card ${itemType.slice(0, -1)}-card`;
             
-            if (itemType === 'companies') {
+            if (itemType === 'companies' || displayType === 'company') {
                 return createCompanyCard(item, cardClass);
             } else if (itemType === 'solicitations') {
                 return createSolicitationCard(item, cardClass);

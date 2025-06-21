@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Enhanced Flask API Backend with Data Type Support
+Enhanced Flask API Backend with Data Type Support - FIXED VERSION
 - Awards, Solicitations, and Companies filtering ✅
 - Enhanced search with type-specific logic ✅
 - Updated stats endpoint ✅
+- Fixed data type inference for actual schema ✅
 """
 
 from flask import Flask, request, jsonify, render_template
@@ -123,7 +124,7 @@ class EnhancedGrantMatcher:
         return [term for term in terms if len(term) > 2 and term.lower() not in stop_words]
     
     def _determine_data_type(self, record: Dict[str, Any]) -> str:
-        """Determine the data type of a record"""
+        """Determine the data type of a record - FIXED VERSION"""
         # Check for explicit grant_type field first
         if record.get('grant_type'):
             return record['grant_type']
@@ -131,26 +132,11 @@ class EnhancedGrantMatcher:
         # Check for solicitation indicators
         if (record.get('solicitation_number') or 
             record.get('current_status') in ['open', 'active'] or
-            record.get('close_date') or
-            record.get('solicitation_title')):
+            record.get('close_date')):
             return 'solicitation'
         
-        # Check for company indicators
-        if (record.get('company_name') or 
-            record.get('firm') or
-            record.get('uei') or 
-            record.get('company_uei') or
-            record.get('number_employees') is not None):
-            return 'company'
-        
-        # Check for award indicators
-        if (record.get('award_year') or 
-            record.get('contract_number') or
-            record.get('award_amount') or
-            record.get('phase')):
-            return 'award'
-        
-        # Default to award if unclear
+        # All SBIR awards are company awards by nature since they go to companies
+        # We don't need separate company records - the awards ARE the company data
         return 'award'
     
     def _apply_data_type_filter(self, grants: List[Dict[str, Any]], data_type: str) -> List[Dict[str, Any]]:
@@ -162,20 +148,29 @@ class EnhancedGrantMatcher:
         for grant in grants:
             record_type = self._determine_data_type(grant)
             
-            # Map plural forms to singular
+            # Map data types properly
             if data_type == 'awards' and record_type == 'award':
                 filtered_grants.append(grant)
             elif data_type == 'solicitations' and record_type == 'solicitation':
                 filtered_grants.append(grant)
-            elif data_type == 'companies' and record_type == 'company':
-                filtered_grants.append(grant)
-            elif data_type == record_type:
+            elif data_type == 'companies':
+                # Companies filter: show awards but group/present them as company data
+                if record_type == 'award' and grant.get('company_name'):
+                    # Transform award record to look like company data for frontend
+                    company_view = grant.copy()
+                    company_view['display_type'] = 'company'
+                    company_view['company_title'] = f"{grant.get('company_name')} - {grant.get('title', '')}"
+                    filtered_grants.append(company_view)
+            elif data_type.rstrip('s') == record_type:  # Handle singular forms
                 filtered_grants.append(grant)
         
         return filtered_grants
     
     def _calculate_tf_idf_score(self, query_terms: List[str], document_text: str) -> float:
         """Calculate TF-IDF score for document against query"""
+        if not query_terms or not document_text:
+            return 0.0
+            
         doc_terms = self._extract_terms(document_text.lower())
         
         if not doc_terms:
@@ -185,13 +180,17 @@ class EnhancedGrantMatcher:
         max_tf = max(tf_counts.values()) if tf_counts else 1
         
         score = 0.0
+        matches_found = False
+        
         for query_term in query_terms:
             if query_term in tf_counts:
                 tf = tf_counts[query_term] / max_tf
                 idf = self.idf_cache.get(query_term, 0)
                 score += tf * idf
+                matches_found = True
         
-        return score
+        # Only return score if actual matches were found
+        return score if matches_found else 0.0
     
     def _calculate_semantic_score(self, query: str, grant: Dict[str, Any], data_type: str = 'all') -> float:
         """Calculate semantic similarity score with data type awareness"""
@@ -206,7 +205,9 @@ class EnhancedGrantMatcher:
             'microfluidics': ['microfluidic', 'chip', 'miniaturized', 'portable', 'point-of-care', 'lab-on-chip'],
             'ai_ml': ['artificial intelligence', 'machine learning', 'deep learning', 'neural network', 'ai', 'ml', 'algorithm'],
             'clinical': ['clinical', 'patient', 'hospital', 'bedside', 'healthcare', 'medical', 'therapeutic'],
-            'research': ['research', 'study', 'investigation', 'experiment', 'innovation', 'development']
+            'research': ['research', 'study', 'investigation', 'experiment', 'innovation', 'development'],
+            'cell': ['cell', 'cellular', 'single cell', 'stem cell', 'cancer cell', 'immune cell', 'blood cell'],
+            'genomics': ['genomic', 'genome', 'genetics', 'gene', 'dna', 'rna', 'sequencing', 'mutation']
         }
         
         # Data type specific clusters
@@ -221,10 +222,15 @@ class EnhancedGrantMatcher:
         grant_text = f"{grant.get('title', '')} {grant.get('description', '')} {grant.get('keywords', '')}".lower()
         
         score = 0.0
+        total_query_matches = 0
+        total_grant_matches = 0
         
         for cluster_name, terms in term_clusters.items():
             query_matches = sum(1 for term in terms if term in query_lower)
             grant_matches = sum(1 for term in terms if term in grant_text)
+            
+            total_query_matches += query_matches
+            total_grant_matches += grant_matches
             
             if query_matches > 0 and grant_matches > 0:
                 cluster_score = (query_matches * grant_matches) / len(terms)
@@ -235,59 +241,107 @@ class EnhancedGrantMatcher:
                     cluster_score *= 2.0
                 score += cluster_score * 3.0
         
+        # CRITICAL: Only return semantic score if query is actually biotools-related
+        # If query has no biotools terms, return 0
+        if total_query_matches == 0:
+            return 0.0
+        
         return score
     
     def _calculate_keyword_score(self, query: str, grant: Dict[str, Any]) -> float:
-        """Calculate score based on exact keyword matches"""
+        """Calculate score based on exact keyword matches - BULLETPROOF VERSION"""
+        if not query or not query.strip():
+            return 0.0
+            
         score = 0.0
-        query_lower = query.lower()
+        query_lower = query.lower().strip()
+        query_words = [w.strip() for w in query_lower.split() if len(w.strip()) > 3]  # Only words > 3 chars
         
+        if not query_words:
+            return 0.0
+        
+        matches_found = False
+        
+        # Title matching (highest weight)
         if grant.get('title'):
             title_lower = grant['title'].lower()
+            
+            # Exact phrase match
             if query_lower in title_lower:
-                score += 15.0
-            query_words = query_lower.split()
+                score += 20.0
+                matches_found = True
+            
+            # Individual word matches (must be whole words)
             for word in query_words:
-                if len(word) > 3 and word in title_lower:
-                    score += 8.0
+                # Use word boundaries to avoid partial matches
+                import re
+                if re.search(r'\b' + re.escape(word) + r'\b', title_lower):
+                    score += 10.0
+                    matches_found = True
         
+        # Keywords matching (high weight)  
         if grant.get('keywords'):
-            keywords = [k.strip().lower() for k in grant['keywords'].split(',')]
-            for keyword in keywords:
-                if keyword in query_lower or query_lower in keyword:
-                    score += 6.0
-                query_words = query_lower.split()
-                for word in query_words:
-                    if len(word) > 3 and word in keyword:
-                        score += 3.0
+            keywords_text = grant['keywords'].lower()
+            
+            # Exact phrase match in keywords
+            if query_lower in keywords_text:
+                score += 8.0
+                matches_found = True
+            
+            # Individual word matches in keywords
+            for word in query_words:
+                import re
+                if re.search(r'\b' + re.escape(word) + r'\b', keywords_text):
+                    score += 4.0
+                    matches_found = True
         
+        # Description matching (medium weight)
         if grant.get('description'):
             desc_lower = grant['description'].lower()
+            
+            # Exact phrase match
             if query_lower in desc_lower:
-                score += 4.0
-            query_words = query_lower.split()
+                score += 6.0
+                matches_found = True
+            
+            # Individual word matches
             for word in query_words:
-                if len(word) > 3 and word in desc_lower:
-                    score += 1.5
+                import re
+                if re.search(r'\b' + re.escape(word) + r'\b', desc_lower):
+                    score += 2.0
+                    matches_found = True
         
-        # Company-specific scoring
-        if grant.get('company_name') or grant.get('firm'):
-            company_name = (grant.get('company_name') or grant.get('firm') or '').lower()
-            if query_lower in company_name:
-                score += 10.0
+        # Company name matching
+        if grant.get('company_name'):
+            company_lower = grant['company_name'].lower()
+            
+            # Exact phrase match
+            if query_lower in company_lower:
+                score += 12.0
+                matches_found = True
+            
+            # Individual word matches
+            for word in query_words:
+                import re
+                if re.search(r'\b' + re.escape(word) + r'\b', company_lower):
+                    score += 6.0
+                    matches_found = True
         
-        biotools_agencies = ['nih', 'nsf', 'sbir', 'cdc', 'darpa', 'nist', 'hhs']
-        if grant.get('agency'):
+        # ONLY award agency bonus if actual content matches were found
+        if matches_found and grant.get('agency'):
+            biotools_agencies = ['nih', 'nsf', 'sbir', 'cdc', 'darpa', 'nist', 'hhs']
             agency_lower = grant['agency'].lower()
             for bio_agency in biotools_agencies:
                 if bio_agency in agency_lower:
                     score += 2.0
                     break
         
-        return score
+        return score if matches_found else 0.0
     
     def _calculate_freshness_score(self, grant: Dict[str, Any]) -> float:
-        """Calculate score based on grant freshness"""
+        """Calculate score based on grant freshness - only for records that already have content matches"""
+        # Freshness should only boost already relevant results, not create relevance
+        # This will be applied only to records that pass other scoring thresholds
         try:
             # For solicitations, check close_date for urgency
             if grant.get('close_date'):
@@ -297,31 +351,31 @@ class EnhancedGrantMatcher:
                 if days_until_close < 0:
                     return 0.0  # Closed
                 elif days_until_close <= 30:
-                    return 8.0  # Very urgent
+                    return 3.0  # Very urgent - reduced from 8.0
                 elif days_until_close <= 90:
-                    return 6.0  # Urgent
+                    return 2.0  # Urgent - reduced from 6.0  
                 else:
-                    return 4.0  # Future opportunity
+                    return 1.0  # Future opportunity - reduced from 4.0
             
-            # For awards and general records, check updated_at
+            # For awards and general records, minimal freshness boost
             if grant.get('updated_at'):
                 updated = datetime.fromisoformat(grant['updated_at'].replace('Z', '+00:00'))
                 days_old = (datetime.now() - updated).days
                 
                 if days_old < 7:
-                    return 5.0
+                    return 1.0  # Reduced from 5.0
                 elif days_old < 30:
-                    return 4.0
+                    return 0.8  # Reduced from 4.0
                 elif days_old < 90:
-                    return 3.0
+                    return 0.6  # Reduced from 3.0
                 elif days_old < 180:
-                    return 2.0
+                    return 0.4  # Reduced from 2.0
                 else:
-                    return 1.0
+                    return 0.2  # Reduced from 1.0
         except Exception as e:
             logger.error(f"Error calculating freshness score: {e}")
         
-        return 1.0
+        return 0.2  # Minimal baseline - reduced from 1.0
     
     def _apply_filters(self, grants: List[Dict[str, Any]], filters: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Apply user-specified filters to grants"""
@@ -382,10 +436,19 @@ class EnhancedGrantMatcher:
             
             # Data type filter
             if filters.get('data_type') and filters['data_type'] != 'all':
-                record_type = self._determine_data_type(grant)
-                filter_type = filters['data_type'].rstrip('s')  # Remove plural 's'
-                if record_type != filter_type:
-                    continue
+                data_type_filter = filters['data_type']
+                if data_type_filter == 'awards':
+                    record_type = self._determine_data_type(grant)
+                    if record_type != 'award':
+                        continue
+                elif data_type_filter == 'solicitations':
+                    record_type = self._determine_data_type(grant)
+                    if record_type != 'solicitation':
+                        continue
+                elif data_type_filter == 'companies':
+                    # For companies, only include awards with company names
+                    if not grant.get('company_name'):
+                        continue
             
             filtered_grants.append(grant)
         
@@ -408,35 +471,33 @@ class EnhancedGrantMatcher:
             
             # Add data type filtering to SQL if specified
             if filters and filters.get('data_type') and filters['data_type'] != 'all':
-                data_type = filters['data_type'].rstrip('s')  # Remove plural 's'
-                if data_type == 'solicitation':
+                data_type = filters['data_type']
+                if data_type == 'solicitations':
                     where_conditions.append(
                         "(grant_type = 'solicitation' OR solicitation_number IS NOT NULL OR current_status IN ('open', 'active'))"
                     )
-                elif data_type == 'award':
-                    where_conditions.append(
-                        "(grant_type = 'award' OR award_year IS NOT NULL OR contract_number IS NOT NULL OR phase IS NOT NULL)"
-                    )
-                elif data_type == 'company':
-                    where_conditions.append(
-                        "(grant_type = 'company' OR company_name IS NOT NULL OR firm IS NOT NULL OR uei IS NOT NULL)"
-                    )
+                elif data_type == 'companies':
+                    # For companies, we want awards that have company names (SBIR awards to companies)
+                    where_conditions.append("company_name IS NOT NULL AND company_name != ''")
+                # For 'awards' or default, no additional filter needed since most records are awards
             
             sql = f"""
                 SELECT *, 
                        CASE 
-                           WHEN LOWER(title) LIKE ? THEN 10
-                           WHEN LOWER(keywords) LIKE ? THEN 7
-                           WHEN LOWER(description) LIKE ? THEN 5
-                           ELSE 1
+                           WHEN LOWER(title) LIKE ? THEN 15
+                           WHEN LOWER(keywords) LIKE ? THEN 10
+                           WHEN LOWER(description) LIKE ? THEN 7
+                           ELSE 0
                        END as relevance_score
                 FROM grants 
-                WHERE {' AND '.join(where_conditions)}
+                WHERE ({' AND '.join(where_conditions)})
+                AND (LOWER(title) LIKE ? OR LOWER(keywords) LIKE ? OR LOWER(description) LIKE ?)
                 ORDER BY relevance_score DESC, title
                 LIMIT ?
             """
             
-            all_params = params + [query_pattern, query_pattern, query_pattern, limit]
+            # Only add the LIKE patterns to the final WHERE clause, not to the calculation
+            all_params = params + [query_pattern, query_pattern, query_pattern, query_pattern, query_pattern, query_pattern, limit]
             cursor.execute(sql, all_params)
             
             results = [dict(row) for row in cursor.fetchall()]
@@ -480,17 +541,47 @@ class EnhancedGrantMatcher:
                 
                 # Apply data type filter early if specified
                 if data_type != 'all':
-                    record_type = self._determine_data_type(grant)
-                    filter_type = data_type.rstrip('s')  # Remove plural 's'
-                    if record_type != filter_type:
-                        continue
+                    if data_type == 'awards':
+                        record_type = self._determine_data_type(grant)
+                        if record_type != 'award':
+                            continue
+                    elif data_type == 'solicitations':
+                        record_type = self._determine_data_type(grant)
+                        if record_type != 'solicitation':
+                            continue
+                    elif data_type == 'companies':
+                        # For companies, only include awards that have company names
+                        if not grant.get('company_name'):
+                            continue
+                        # Add company display metadata
+                        grant['display_type'] = 'company'
                 
                 combined_text = f"{grant.get('title', '')} {grant.get('description', '')} {grant.get('keywords', '')}"
+                
+                # CRITICAL: Pre-filter - only score records that might be relevant
+                query_lower = query.lower()
+                text_lower = combined_text.lower()
+                
+                # Quick relevance check - must contain at least one query word
+                has_basic_match = False
+                for word in query_terms:
+                    if word in text_lower:
+                        has_basic_match = True
+                        break
+                
+                # Skip records with no basic word matches
+                if not has_basic_match:
+                    continue
                 
                 tf_idf_score = self._calculate_tf_idf_score(query_terms, combined_text)
                 semantic_score = self._calculate_semantic_score(query, grant, data_type)
                 keyword_score = self._calculate_keyword_score(query, grant)
                 freshness_score = self._calculate_freshness_score(grant)
+                
+                # CRITICAL: All content scores must be > 0 for any final score
+                content_score = tf_idf_score + semantic_score + keyword_score
+                if content_score <= 0:
+                    continue
                 
                 # Adjust weights based on data type
                 if data_type in ['solicitations', 'solicitation']:
@@ -518,8 +609,8 @@ class EnhancedGrantMatcher:
                         freshness_score * 0.10
                     )
                 
-                # Lower threshold for better recall
-                if final_score > 0.1:
+                # Lower threshold for better recall - INCREASED TO FIX RELEVANCE
+                if final_score > 2.0:  # Increased from 0.5 to 2.0 for better filtering
                     grant['relevance_score'] = round(final_score, 2)
                     # Add inferred data type for frontend
                     grant['inferred_type'] = self._determine_data_type(grant)
@@ -527,7 +618,12 @@ class EnhancedGrantMatcher:
             
             if not scored_grants:
                 logger.info(f"Enhanced search found no results for '{query}' in {data_type}, using simple search")
-                return self._simple_search(query, limit, filters)
+                simple_results = self._simple_search(query, limit, filters)
+                if simple_results:
+                    return simple_results
+                else:
+                    logger.warning(f"No results found for '{query}' in any search method")
+                    return []
             
             # Apply additional filters
             if filters:
@@ -575,23 +671,22 @@ class EnhancedGrantMatcher:
             total_grants = cursor.fetchone()[0]
             stats['total_grants'] = total_grants
             
-            # Count by inferred type
-            cursor.execute("SELECT * FROM grants")
-            all_records = cursor.fetchall()
+            # Count by grant_type field and infer companies from awards
+            cursor.execute("SELECT grant_type, COUNT(*) FROM grants WHERE grant_type IS NOT NULL GROUP BY grant_type")
+            type_counts_raw = cursor.fetchall()
+            type_counts = {'award': 0, 'solicitation': 0}
             
-            type_counts = {'award': 0, 'solicitation': 0, 'company': 0}
+            for gtype, count in type_counts_raw:
+                if gtype in type_counts:
+                    type_counts[gtype] = count
             
-            for record in all_records:
-                record_dict = dict(record) if hasattr(record, 'keys') else {
-                    desc[0]: record[i] for i, desc in enumerate(cursor.description)
-                }
-                inferred_type = self._determine_data_type(record_dict)
-                if inferred_type in type_counts:
-                    type_counts[inferred_type] += 1
+            # Count companies as awards with company names (since SBIR awards go to companies)
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE company_name IS NOT NULL AND company_name != ''")
+            companies_count = cursor.fetchone()[0]
             
             stats['awards_count'] = type_counts['award']
             stats['solicitations_count'] = type_counts['solicitation'] 
-            stats['companies_count'] = type_counts['company']
+            stats['companies_count'] = companies_count
             
             # Recent updates
             try:
@@ -607,14 +702,28 @@ class EnhancedGrantMatcher:
             
             # Open solicitations (active ones)
             try:
+                # First check total solicitations
+                cursor.execute("SELECT COUNT(*) FROM grants WHERE grant_type = 'solicitation'")
+                total_solicitations = cursor.fetchone()[0]
+                
+                # Then check open ones
                 cursor.execute("""
                     SELECT COUNT(*) FROM grants 
-                    WHERE (grant_type = 'solicitation' OR current_status IN ('open', 'active'))
+                    WHERE grant_type = 'solicitation'
                     AND (close_date IS NULL OR close_date > date('now'))
                 """)
-                stats['open_solicitations'] = cursor.fetchone()[0]
+                open_solicitations = cursor.fetchone()[0]
+                
+                stats['total_solicitations'] = total_solicitations
+                stats['open_solicitations'] = open_solicitations
+                
+                # Use total solicitations for the main count, not just open ones
+                stats['solicitations_count'] = total_solicitations
+                
             except sqlite3.OperationalError:
+                stats['total_solicitations'] = 0
                 stats['open_solicitations'] = 0
+                stats['solicitations_count'] = 0
             
             stats['last_updated'] = datetime.now().isoformat()
             
@@ -808,7 +917,7 @@ def get_grant_details(grant_id):
 
 
 @app.route('/api/stats', methods=['GET'])
-@limiter.limit("20 per hour;2 per minute")
+@limiter.limit("60 per hour;10 per minute")  # Increased from 20 per hour;2 per minute
 def get_stats():
     """Get enhanced database statistics with data type breakdown"""
     try:
