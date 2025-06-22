@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Enhanced Flask API Backend with Data Type Support - FIXED VERSION
+Enhanced Flask API Backend with Data Type Support and Biotools Filters - COMPLETE VERSION
 - Awards, Solicitations, and Companies filtering ✅
 - Enhanced search with type-specific logic ✅
 - Updated stats endpoint ✅
 - Fixed data type inference for actual schema ✅
+- Tool Type and Focus Area filters ✅
 """
 
 from flask import Flask, request, jsonify, render_template
@@ -434,6 +435,39 @@ class EnhancedGrantMatcher:
                 if not any(keyword in grant_text for keyword in additional_keywords):
                     continue
             
+            # Tool type filter
+            if filters.get('tool_type'):
+                tool_type = filters['tool_type'].lower()
+                grant_text = f"{grant.get('title', '')} {grant.get('description', '')} {grant.get('keywords', '')}".lower()
+                
+                tool_keywords = {
+                    'instrument': ['microscope', 'spectrometer', 'sequencer', 'cytometer', 'analyzer'],
+                    'software': ['software', 'algorithm', 'pipeline', 'bioinformatics', 'computational'],
+                    'assay': ['assay', 'test kit', 'reagent', 'pcr', 'elisa', 'immunoassay'],
+                    'platform': ['platform', 'system', 'workstation', 'microfluidic', 'automated']
+                }
+                
+                if tool_type in tool_keywords:
+                    if not any(keyword in grant_text for keyword in tool_keywords[tool_type]):
+                        continue
+
+            # Focus area filter  
+            if filters.get('focus_area'):
+                focus_area = filters['focus_area'].lower()
+                grant_text = f"{grant.get('title', '')} {grant.get('description', '')} {grant.get('keywords', '')}".lower()
+                
+                focus_keywords = {
+                    'single_cell': ['single cell', 'single-cell', 'sc-seq', 'cell sorting'],
+                    'genomics': ['genomics', 'genome', 'dna', 'sequencing', 'genotyping'],
+                    'proteomics': ['proteomics', 'protein', 'peptide', 'mass spectrometry'],
+                    'diagnostics': ['diagnostic', 'biomarker', 'clinical test', 'detection'],
+                    'bioinformatics': ['bioinformatics', 'computational biology', 'data analysis']
+                }
+                
+                if focus_area in focus_keywords:
+                    if not any(keyword in grant_text for keyword in focus_keywords[focus_area]):
+                        continue
+            
             # Data type filter
             if filters.get('data_type') and filters['data_type'] != 'all':
                 data_type_filter = filters['data_type']
@@ -835,7 +869,7 @@ def grant_detail_page(grant_id):
 @app.route('/api/search', methods=['POST'])
 @limiter.limit("50 per hour;5 per minute")
 def search_grants():
-    """Enhanced search for grants with data type support"""
+    """Enhanced search for grants with data type support and biotools filters"""
     client_ip = get_remote_address()
     
     try:
@@ -865,6 +899,10 @@ def search_grants():
         # Extract data type for logging
         data_type = filters.get('data_type', 'all')
         
+        # Extract new biotools filters
+        tool_type = filters.get('tool_type', '')
+        focus_area = filters.get('focus_area', '')
+        
         grants = grant_matcher.search_grants(query, limit, filters)
         
         log_request('search', query, client_ip, len(grants), data_type)
@@ -873,11 +911,13 @@ def search_grants():
             enhanced_grants = enhance_with_agent(query, grants)
             grants = enhanced_grants if enhanced_grants else grants
         
-        logger.info(f"Search completed: query='{query}', type={data_type}, results={len(grants)}, ip={client_ip}")
+        logger.info(f"Search completed: query='{query}', type={data_type}, tool_type={tool_type}, focus_area={focus_area}, results={len(grants)}, ip={client_ip}")
         
         return jsonify({
             'query': query,
             'data_type': data_type,
+            'tool_type': tool_type,
+            'focus_area': focus_area,
             'results': grants,
             'total_found': len(grants),
             'filters_applied': bool(filters),
@@ -1063,7 +1103,7 @@ if __name__ == '__main__':
         logger.error("Database not found. Run the scraper first.")
         exit(1)
     else:
-        logger.info("Enhanced Grant Matcher with Data Type Support initialized successfully!")
+        logger.info("Enhanced Grant Matcher with Data Type Support and Biotools Filters initialized successfully!")
         logger.info(f"IDF cache contains {len(grant_matcher.idf_cache)} terms")
         
         # Log initial stats

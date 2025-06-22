@@ -705,6 +705,32 @@
                         <input type="text" id="keywords-filter" placeholder="microfluidics, imaging">
                     </div>
                 </div>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="tool-type-filter">Tool Type</label>
+                        <select id="tool-type-filter">
+                            <option value="">All Tool Types</option>
+                            <option value="instrument">Instruments</option>
+                            <option value="software">Software</option>
+                            <option value="assay">Assays</option>
+                            <option value="platform">Platforms</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="focus-area-filter">Focus Area</label>
+                        <select id="focus-area-filter">
+                            <option value="">All Focus Areas</option>
+                            <option value="single_cell">Single Cell</option>
+                            <option value="genomics">Genomics</option>
+                            <option value="proteomics">Proteomics</option>
+                            <option value="diagnostics">Diagnostics</option>
+                            <option value="bioinformatics">Bioinformatics</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <!-- Placeholder for future filter -->
+                    </div>
+                </div>
             </div>
 
             <div class="saved-searches">
@@ -737,7 +763,7 @@
     <div id="notification" class="notification"></div>
 
     <script>
-        // Enhanced JavaScript with data type functionality
+        // Enhanced JavaScript with data type functionality and biotools filters
         const API_BASE = window.location.origin + '/api';
         let currentResults = [];
         let recentSearches = JSON.parse(localStorage.getItem('recentSearches') || '[]');
@@ -868,7 +894,7 @@
             showLoading();
             hideResults();
 
-            // Get filter values
+            // Get filter values including new biotools filters
             const filters = {
                 agency: document.getElementById('agency-filter').value,
                 amount_min: document.getElementById('amount-min').value,
@@ -876,7 +902,9 @@
                 deadline: document.getElementById('deadline-filter').value,
                 phase: document.getElementById('phase-filter').value,
                 keywords: document.getElementById('keywords-filter').value,
-                data_type: currentDataType // Add data type filter
+                tool_type: document.getElementById('tool-type-filter').value,    // NEW
+                focus_area: document.getElementById('focus-area-filter').value,  // NEW
+                data_type: currentDataType
             };
 
             try {
