@@ -50,24 +50,33 @@ class SBIRScraper:
         
         self.setup_database()
         
-        # Enhanced biotools-relevant keywords for filtering
-        self.biotools_keywords = [
-            'diagnostic', 'biomarker', 'assay', 'test', 'detection', 'screening',
-            'laboratory', 'instrumentation', 'microscopy', 'spectrometry', 'imaging',
-            'biotechnology', 'bioengineering', 'medical device', 'biosensor',
-            'microfluidics', 'lab-on-chip', 'point-of-care', 'automation',
-            'genomics', 'proteomics', 'molecular', 'analytical', 'chromatography',
-            'electrophoresis', 'mass spectrometry', 'sequencing', 'pcr',
-            'cell analysis', 'protein analysis', 'dna analysis', 'rna analysis',
-            'bioinformatics', 'computational biology', 'machine learning',
-            'artificial intelligence', 'high throughput', 'drug discovery',
-            'pharmaceutical', 'therapeutics', 'clinical', 'biomedical',
-            'sensor', 'monitor', 'measurement', 'analysis', 'research tool',
-            'scientific instrument', 'clinical trial', 'medical', 'healthcare',
-            'biological', 'biochemical', 'biomolecular', 'therapeutic',
-            'pathogen', 'vaccine', 'immunology', 'oncology', 'cardiology',
-            'neurology', 'dermatology', 'ophthalmology', 'orthopedic'
-        ]
+        # Enhanced biotools-specific keywords - TOOL-FOCUSED
+    self.biotools_keywords = [
+        # Physical Instruments (highest priority)
+        'microscope', 'microscopy', 'spectrometer', 'spectrometry', 'sequencer', 'sequencing',
+        'cytometer', 'analyzer', 'imaging system', 'detection system', 'scanner', 'reader',
+        'chromatography', 'electrophoresis', 'mass spectrometry', 'flow cytometry',
+        
+        # Software & Computational Tools
+        'software', 'algorithm', 'pipeline', 'bioinformatics tool', 'analysis software',
+        'computational tool', 'modeling software', 'data analysis', 'visualization tool',
+        
+        # Assays & Test Methods
+        'assay', 'test kit', 'reagent', 'probe', 'antibody', 'pcr', 'qpcr', 'elisa',
+        'immunoassay', 'biosensor', 'diagnostic test', 'biomarker assay',
+        
+        # Platforms & Systems
+        'platform', 'system', 'workstation', 'microfluidic', 'lab-on-chip',
+        'automated system', 'robotic system', 'screening platform', 'high-throughput',
+        
+        # Focus Areas (biotools applications)
+        'single cell', 'genomics', 'proteomics', 'metabolomics', 'spatial biology',
+        'cell biology', 'molecular biology', 'bioinformatics', 'immunology',
+        
+        # Product Development (all phases)
+        'prototype', 'commercialize', 'manufacturing', 'clinical validation',
+        'product development', 'innovation', 'phase i', 'phase ii'
+    ]
     
     def setup_database(self):
         """Create enhanced database schema for SBIR/STTR data"""
