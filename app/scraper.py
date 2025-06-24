@@ -553,7 +553,14 @@ class CompleteBiotoolsScraper:
                 amount = 0
                 if award.get('award_amount'):
                     try:
-                        amount_str = str(award['award_amount']).replace(',', '').replace('$', '')
+                        amount_str = str(award['award_amount']).replace(',', '').replace('#!/usr/bin/env python3
+"""
+Complete Enhanced BioTools SBIR/STTR Scraper - Fixed Version
+Key improvements over previous version:
+- Fixed agency mappings (NIH/CDC under HHS, DARPA under DOD)
+- Enhanced solicitation collection strategy
+- Improved error handling and rate limiting
+- Better compound keyword validation, '')
                         amount = int(float(amount_str))
                     except (ValueError, TypeError):
                         amount = 0
@@ -680,10 +687,16 @@ class CompleteBiotoolsScraper:
             stats['biotools_validated'] = cursor.fetchone()[0]
             
             cursor.execute("SELECT AVG(relevance_score), AVG(confidence_score), AVG(agency_alignment_score) FROM grants WHERE relevance_score > 0")
-            avg_scores = cursor.fetchone()
-            stats['avg_relevance_score'] = avg_scores[0] or 0
-            stats['avg_confidence_score'] = avg_scores[1] or 0
-            stats['avg_agency_alignment'] = avg_scores[2] or 0
+            result = cursor.fetchone()
+            if result and result[0] is not None:
+                avg_scores = result
+                stats['avg_relevance_score'] = avg_scores[0] or 0
+                stats['avg_confidence_score'] = avg_scores[1] or 0
+                stats['avg_agency_alignment'] = avg_scores[2] or 0
+            else:
+                stats['avg_relevance_score'] = 0
+                stats['avg_confidence_score'] = 0
+                stats['avg_agency_alignment'] = 0
             
             # Category distribution
             cursor.execute("""
@@ -719,7 +732,7 @@ class CompleteBiotoolsScraper:
                 stats['compound_keyword_matches'] = 0
             
             # Top compound keywords
-            try:
+                            try:
                 cursor.execute("""
                     SELECT compound_keyword_matches, COUNT(*) 
                     FROM grants 
@@ -984,7 +997,8 @@ class CompleteBiotoolsScraper:
         if working_agencies < len(self.biotools_agencies):
             failed_agencies = [agency for agency, data in test_results['agency_validation'].items() 
                              if not data.get('api_accessible', False)]
-            self.logger.info(f"  • Focus on working agencies: {[agency for agency in self.biotools_agencies.keys() if agency not in failed_agencies]}")
+            working_list = [agency for agency in self.biotools_agencies.keys() if agency not in failed_agencies]
+            self.logger.info(f"  • Focus on working agencies: {working_list}")
         
         if test_results.get('compound_keyword_test', {}).get('effectiveness_rate', 0) < 15:
             self.logger.info("  • Consider expanding compound keyword list")
@@ -1092,4 +1106,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main() 
+                #!/usr/bin/env python3
+"""
+Complete Enhanced BioTools SBIR/STTR Scraper - Fixed Version
+Key improvements over previous version:
+- Fixed agency mappings (NIH/CDC under HHS, DARPA under DOD)
+- Enhanced solicitation collection strategy
+- Improved error handling and rate limiting
+- Better compound keyword validation
