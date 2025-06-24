@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioTools Grant Matcher Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .stats-section {
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            color: white;
+            text-align: center;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .stat-item h3 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+
+        .search-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        /* Data Type Selector */
+        .data-type-selector {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .data-type-label {
+            font-weight: 600;
+            color: #495057;
+            font-size: 1rem;
+        }
+
+        .data-type-options {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .data-type-option {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .data-type-option:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .data-type-option.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .data-type-option input[type="radio"] {
+            margin-right: 8px;
+            transform: scale(1.2);
+        }
+
+        .data-type-option .option-icon {
+            font-size: 1.2rem;
+            margin-right: 8px;
+        }
+
+        .data-type-option .option-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .data-type-option .option-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .data-type-option .option-subtitle {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .search-btn {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .search-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .toggle-filters {
+            background: none;
+            border: none;
+            color: #667eea;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+
+        .toggle-filters:hover {
+            background-color: #f0f0f0;
+        }
+
+        .advanced-filters {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .filter-group select,
+        .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .context-help {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e8f4fd;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .context-help h4 {
+            color: #495057;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .context-help p {
+            color: #6c757d;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .saved-searches {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e8f4fd;
+            border-radius: 8px;
+        }
+
+        .saved-search-item {
+            display: inline-block;
+            background: white;
+            padding: 5px 12px;
+            margin: 3px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border: 1px solid #ddd;
+        }
+
+        .saved-search-item:hover {
+            background: #f0f0f0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+
+        .results-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f8f9fa;
+        }
+
+        .results-type-indicator {
+            display: inline-flex;
+            align-items: center;
+            background: #667eea;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .results-type-indicator .type-icon {
+            margin-right: 6px;
+        }
+
+        .grant-card {
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .grant-card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .grant-card.award-card {
+            border-left: 4px solid #28a745;
+        }
+
+        .grant-card.solicitation-card {
+            border-left: 4px solid #ffc107;
+        }
+
+        .grant-card.company-card {
+            border-left: 4px solid #6f42c1;
+        }
+
+        .grant-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            line-height: 1.3;
+        }
+
+        .grant-meta {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            color: #666;
+            flex-wrap: wrap;
+        }
+
+        .grant-type-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .badge-award {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-solicitation {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-company {
+            background: #e2e3f5;
+            color: #383d41;
+        }
+
+        .grant-agency {
+            background: #667eea;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .grant-amount {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        .grant-deadline {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
+        .grant-deadline.upcoming {
+            color: #ffc107;
+        }
+
+        .grant-deadline.far {
+            color: #6c757d;
+        }
+
+        .grant-description {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .grant-keywords {
+            margin-bottom: 15px;
+        }
+
+        .keyword-tag {
+            background: #f8f9fa;
+            color: #495057;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            margin-right: 6px;
+            margin-bottom: 4px;
+            display: inline-block;
+        }
+
+        .grant-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-primary {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #218838;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-apply {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-apply:hover {
+            background: #e0a800;
+        }
+
+        .relevance-score {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background: #28a745;
+        }
+
+        .notification.error {
+            background: #dc3545;
+        }
+
+        @media (max-width: 768px) {
+            .data-type-options {
+                justify-content: center;
+            }
+            
+            .data-type-option {
+                min-width: 100px;
+                font-size: 0.85rem;
+            }
+            
+            .search-form {
+                flex-direction: column;
+            }
+            
+            .filter-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .results-toolbar {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .grant-meta {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .grant-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧬 BioTools Grant Matcher Pro</h1>
+            <p>AI-powered funding discovery for biomedical research tools</p>
+        </div>
+
+        <div class="stats-section" id="stats-section">
+            <h3>Database Status</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <h3 id="total-awards">-</h3>
+                    <p>Awards</p>
+                </div>
+                <div class="stat-item">
+                    <h3 id="total-solicitations">-</h3>
+                    <p>Open Solicitations</p>
+                </div>
+                <div class="stat-item">
+                    <h3 id="total-companies">-</h3>
+                    <p>Companies</p>
+                </div>
+                <div class="stat-item">
+                    <h3 id="success-rate">78%</h3>
+                    <p>User Success Rate</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="search-section">
+            <!-- Data Type Selector -->
+            <div class="data-type-selector">
+                <div class="data-type-label">Search in:</div>
+                <div class="data-type-options">
+                    <label class="data-type-option active" for="type-all">
+                        <input type="radio" name="data-type" value="all" id="type-all" checked>
+                        <div class="option-details">
+                            <div class="option-title">🔍 All Data</div>
+                            <div class="option-subtitle">Comprehensive search</div>
+                        </div>
+                    </label>
+                    <label class="data-type-option" for="type-awards">
+                        <input type="radio" name="data-type" value="awards" id="type-awards">
+                        <div class="option-details">
+                            <div class="option-title">🏆 Awards</div>
+                            <div class="option-subtitle">Historical funding</div>
+                        </div>
+                    </label>
+                    <label class="data-type-option" for="type-solicitations">
+                        <input type="radio" name="data-type" value="solicitations" id="type-solicitations">
+                        <div class="option-details">
+                            <div class="option-title">📋 Solicitations</div>
+                            <div class="option-subtitle">Open opportunities</div>
+                        </div>
+                    </label>
+                    <label class="data-type-option" for="type-companies">
+                        <input type="radio" name="data-type" value="companies" id="type-companies">
+                        <div class="option-details">
+                            <div class="option-title">🏢 Companies</div>
+                            <div class="option-subtitle">Funded organizations</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Context Help -->
+            <div class="context-help" id="context-help">
+                <h4>💡 Searching All Data</h4>
+                <p>Find awards, solicitations, and companies across the entire biotools funding ecosystem. Use specific terms like "diagnostic biosensor" or "microfluidics platform" for best results.</p>
+            </div>
+
+            <form class="search-form" id="search-form">
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    id="search-input"
+                    placeholder="Describe your biotools project or research area..."
+                    required
+                >
+                <button type="submit" class="search-btn" id="search-btn">
+                    🔍 Find Grants
+                </button>
+            </form>
+
+            <button class="toggle-filters" onclick="toggleAdvancedFilters()">
+                🔧 Advanced Filters
+            </button>
+
+            <div class="advanced-filters" id="advanced-filters">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="agency-filter">Agency</label>
+                        <select id="agency-filter">
+                            <option value="">All Agencies</option>
+                            <option value="NSF">NSF</option>
+                            <option value="NIH">NIH</option>
+                            <option value="HHS">HHS (SBIR)</option>
+                            <option value="DOD">DOD</option>
+                            <option value="DOE">DOE</option>
+                            <option value="CDC">CDC</option>
+                            <option value="DARPA">DARPA</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="amount-min">Min Amount ($)</label>
+                        <input type="number" id="amount-min" placeholder="50000">
+                    </div>
+                    <div class="filter-group">
+                        <label for="amount-max">Max Amount ($)</label>
+                        <input type="number" id="amount-max" placeholder="1000000">
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="deadline-filter">Deadline</label>
+                        <select id="deadline-filter">
+                            <option value="">Any Deadline</option>
+                            <option value="30">Next 30 days</option>
+                            <option value="90">Next 90 days</option>
+                            <option value="180">Next 6 months</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="phase-filter">Phase (SBIR/STTR)</label>
+                        <select id="phase-filter">
+                            <option value="">All Phases</option>
+                            <option value="I">Phase I</option>
+                            <option value="II">Phase II</option>
+                            <option value="IB">Phase IB</option>
+                            <option value="IIB">Phase IIB</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="keywords-filter">Additional Keywords</label>
+                        <input type="text" id="keywords-filter" placeholder="microfluidics, imaging">
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="tool-type-filter">Tool Type</label>
+                        <select id="tool-type-filter">
+                            <option value="">All Tool Types</option>
+                            <option value="instrument">Instruments</option>
+                            <option value="software">Software</option>
+                            <option value="assay">Assays</option>
+                            <option value="platform">Platforms</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="focus-area-filter">Focus Area</label>
+                        <select id="focus-area-filter">
+                            <option value="">All Focus Areas</option>
+                            <option value="single_cell">Single Cell</option>
+                            <option value="genomics">Genomics</option>
+                            <option value="proteomics">Proteomics</option>
+                            <option value="diagnostics">Diagnostics</option>
+                            <option value="bioinformatics">Bioinformatics</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <!-- Placeholder for future filter -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="saved-searches">
+                <h4>Recent Searches:</h4>
+                <div id="recent-searches"></div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            Analyzing grants with AI...
+        </div>
+
+        <div id="results-section" class="results-section" style="display: none;">
+            <div class="results-toolbar">
+                <div>
+                    <h2>Search Results</h2>
+                    <span class="results-type-indicator" id="results-type-indicator">
+                        <span class="type-icon">🔍</span>
+                        <span id="type-text">All Data</span>
+                    </span>
+                    <p class="results-count" id="results-count"></p>
+                </div>
+            </div>
+            
+            <div id="results-container"></div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // Enhanced JavaScript with data type functionality and biotools filters
+        const API_BASE = window.location.origin + '/api';
+        let currentResults = [];
+        let recentSearches = JSON.parse(localStorage.getItem('recentSearches') || '[]');
+        let currentDataType = 'all';
+
+        // Context help content for each data type
+        const contextHelp = {
+            'all': {
+                title: '💡 Searching All Data',
+                text: 'Find awards, solicitations, and companies across the entire biotools funding ecosystem. Use specific terms like "diagnostic biosensor" or "microfluidics platform" for best results.'
+            },
+            'awards': {
+                title: '🏆 Searching Historical Awards',
+                text: 'Explore past funding awards to identify successful projects, research trends, and potential collaborators. Great for competitive analysis and proposal development.'
+            },
+            'solicitations': {
+                title: '📋 Searching Open Solicitations',
+                text: 'Find active funding opportunities you can apply for right now. Includes SBIR/STTR programs, grants, and other competitive funding announcements.'
+            },
+            'companies': {
+                title: '🏢 Searching Funded Companies',
+                text: 'Discover organizations that have received biotools funding. Useful for partnership opportunities, market research, and understanding the competitive landscape.'
+            }
+        };
+
+        // Initialize page
+        window.addEventListener('load', () => {
+            loadStats();
+            loadRecentSearches();
+            setupDataTypeHandlers();
+            document.getElementById('search-form').addEventListener('submit', handleSearch);
+        });
+
+        function setupDataTypeHandlers() {
+            const typeOptions = document.querySelectorAll('input[name="data-type"]');
+            
+            typeOptions.forEach(option => {
+                option.addEventListener('change', function() {
+                    // Update visual state
+                    document.querySelectorAll('.data-type-option').forEach(opt => opt.classList.remove('active'));
+                    this.closest('.data-type-option').classList.add('active');
+                    
+                    // Update current data type
+                    currentDataType = this.value;
+                    
+                    // Update context help
+                    updateContextHelp(currentDataType);
+                    
+                    // Update search placeholder
+                    updateSearchPlaceholder(currentDataType);
+                });
+            });
+        }
+
+        function updateContextHelp(dataType) {
+            const helpDiv = document.getElementById('context-help');
+            const help = contextHelp[dataType];
+            
+            helpDiv.innerHTML = `
+                <h4>${help.title}</h4>
+                <p>${help.text}</p>
+            `;
+        }
+
+        function updateSearchPlaceholder(dataType) {
+            const searchInput = document.getElementById('search-input');
+            const placeholders = {
+                'all': 'Describe your biotools project or research area...',
+                'awards': 'Search historical awards (e.g., "genomic sequencing platform")...',
+                'solicitations': 'Find open opportunities (e.g., "point-of-care diagnostic")...',
+                'companies': 'Search funded companies (e.g., "microfluidics startup")...'
+            };
+            
+            searchInput.placeholder = placeholders[dataType];
+        }
+
+        function toggleAdvancedFilters() {
+            const filters = document.getElementById('advanced-filters');
+            if (filters.style.display === 'none' || filters.style.display === '') {
+                filters.style.display = 'block';
+            } else {
+                filters.style.display = 'none';
+            }
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        function addToRecentSearches(query) {
+            if (!recentSearches.includes(query)) {
+                recentSearches.unshift(query);
+                recentSearches = recentSearches.slice(0, 10);
+                localStorage.setItem('recentSearches', JSON.stringify(recentSearches));
+                loadRecentSearches();
+            }
+        }
+
+        function loadRecentSearches() {
+            const container = document.getElementById('recent-searches');
+            if (recentSearches.length > 0) {
+                container.innerHTML = recentSearches.map(search => 
+                    `<span class="saved-search-item" onclick="searchRecent('${search}')">${search}</span>`
+                ).join('');
+            } else {
+                container.innerHTML = '<span style="color: #666; font-style: italic;">No recent searches</span>';
+            }
+        }
+
+        function searchRecent(query) {
+            document.getElementById('search-input').value = query;
+            document.getElementById('search-form').dispatchEvent(new Event('submit'));
+        }
+
+        async function handleSearch(event) {
+            event.preventDefault();
+            
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) return;
+
+            showLoading();
+            hideResults();
+
+            // Get filter values including new biotools filters
+            const filters = {
+                agency: document.getElementById('agency-filter').value,
+                amount_min: document.getElementById('amount-min').value,
+                amount_max: document.getElementById('amount-max').value,
+                deadline: document.getElementById('deadline-filter').value,
+                phase: document.getElementById('phase-filter').value,
+                keywords: document.getElementById('keywords-filter').value,
+                tool_type: document.getElementById('tool-type-filter').value,    // NEW
+                focus_area: document.getElementById('focus-area-filter').value,  // NEW
+                data_type: currentDataType
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        query, 
+                        limit: 50, 
+                        filters 
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Search failed');
+                }
+
+                currentResults = data.results;
+                addToRecentSearches(query);
+                displayResults(currentResults, data.query, currentDataType);
+                
+                const typeText = {
+                    'all': 'All Data',
+                    'awards': 'Awards',
+                    'solicitations': 'Solicitations', 
+                    'companies': 'Companies'
+                }[currentDataType];
+                
+                showNotification(`Found ${currentResults.length} ${typeText.toLowerCase()} results!`);
+                
+            } catch (error) {
+                showNotification(error.message, 'error');
+                console.error('Search error:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function displayResults(results, query, dataType) {
+            const resultsSection = document.getElementById('results-section');
+            const resultsContainer = document.getElementById('results-container');
+            const resultsCount = document.getElementById('results-count');
+            const typeIndicator = document.getElementById('results-type-indicator');
+            const typeText = document.getElementById('type-text');
+
+            // Update type indicator
+            const typeInfo = {
+                'all': { icon: '🔍', text: 'All Data' },
+                'awards': { icon: '🏆', text: 'Awards' },
+                'solicitations': { icon: '📋', text: 'Solicitations' },
+                'companies': { icon: '🏢', text: 'Companies' }
+            };
+
+            const info = typeInfo[dataType];
+            typeIndicator.querySelector('.type-icon').textContent = info.icon;
+            typeText.textContent = info.text;
+
+            if (results.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div style="text-align: center; padding: 60px; color: #666;">
+                        <h3>No ${info.text.toLowerCase()} found</h3>
+                        <p>Try adjusting your search terms or filters, or search in a different data type</p>
+                    </div>
+                `;
+            } else {
+                resultsContainer.innerHTML = results.map(result => createResultCard(result, dataType)).join('');
+            }
+
+            resultsCount.textContent = `Found ${results.length} ${info.text.toLowerCase()} for "${query}"`;
+            resultsSection.style.display = 'block';
+        }
+
+       function createResultCard(item, dataType) {
+            // Determine the actual item type from the data
+            let itemType = dataType;
+            let displayType = item.display_type || dataType;
+            
+            if (dataType === 'all') {
+                // Infer type from data structure
+                if (item.grant_type === 'solicitation' || item.solicitation_number) {
+                    itemType = 'solicitations';
+                } else if (item.display_type === 'company' || (dataType === 'companies')) {
+                    itemType = 'companies';
+                } else {
+                    itemType = 'awards'; // default
+                }
+            } else if (dataType === 'companies') {
+                itemType = 'companies';
+                displayType = 'company';
+            }
+
+            const cardClass = `grant-card ${itemType.slice(0, -1)}-card`;
+            
+            if (itemType === 'companies' || displayType === 'company') {
+                return createCompanyCard(item, cardClass);
+            } else if (itemType === 'solicitations') {
+                return createSolicitationCard(item, cardClass);
+            } else {
+                return createAwardCard(item, cardClass);
+            }
+        }
+
+        function createAwardCard(grant, cardClass) {
+            const amount = grant.amount_max || grant.award_amount ? 
+                `${formatNumber(grant.amount_max || grant.award_amount)}` : 'Amount varies';
+            const keywords = grant.keywords ? grant.keywords.split(',').slice(0, 5) : [];
+            const description = grant.description ? 
+                (grant.description.length > 300 ? grant.description.substring(0, 300) + '...' : grant.description) 
+                : 'No description available';
+
+            const company = grant.company_name || grant.firm || grant.eligibility || 'Research Institution';
+            const year = grant.award_year ? ` (${grant.award_year})` : '';
+            const phase = grant.phase ? ` • Phase ${grant.phase}` : '';
+
+            return `
+                <div class="${cardClass}" data-item-id="${grant.id}">
+                    <div class="relevance-score">${grant.relevance_score?.toFixed(1) || '0.0'}</div>
+                    <span class="grant-type-badge badge-award">🏆 Award</span>
+                    <h3 class="grant-title">${escapeHtml(grant.title || 'Untitled Award')}</h3>
+                    <div class="grant-meta">
+                        <span class="grant-agency">${escapeHtml(grant.agency || 'Unknown Agency')}</span>
+                        <span class="grant-amount">${amount}</span>
+                        <span>Company: ${escapeHtml(company)}${year}</span>
+                        ${phase ? `<span>${phase}</span>` : ''}
+                        <span>ID: ${escapeHtml(grant.funding_opportunity_number || grant.contract_number || 'N/A')}</span>
+                    </div>
+                    <div class="grant-description">
+                        ${escapeHtml(description)}
+                    </div>
+                    ${keywords.length > 0 ? `
+                        <div class="grant-keywords">
+                            ${keywords.map(keyword => `<span class="keyword-tag">${escapeHtml(keyword.trim())}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    <div class="grant-actions">
+                        <button class="action-btn btn-primary" onclick="viewItemDetails(${grant.id}, 'award')">
+                            📋 View Details
+                        </button>
+                        ${grant.url ? `<a href="${escapeHtml(grant.url)}" target="_blank" class="action-btn btn-secondary">🔗 Official Page</a>` : ''}
+                        <button class="action-btn btn-secondary" onclick="findSimilarAwards(${grant.id})">
+                            🔍 Find Similar
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createSolicitationCard(grant, cardClass) {
+            const keywords = grant.keywords ? grant.keywords.split(',').slice(0, 5) : [];
+            const description = grant.description ? 
+                (grant.description.length > 300 ? grant.description.substring(0, 300) + '...' : grant.description) 
+                : 'No description available';
+
+            // Calculate deadline urgency
+            let deadlineInfo = '';
+            let deadlineClass = '';
+            if (grant.close_date || grant.deadline) {
+                try {
+                    const deadline = new Date(grant.close_date || grant.deadline);
+                    const now = new Date();
+                    const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysUntil < 0) {
+                        deadlineInfo = 'Closed';
+                        deadlineClass = 'grant-deadline';
+                    } else if (daysUntil <= 30) {
+                        deadlineInfo = `${daysUntil} days left`;
+                        deadlineClass = 'grant-deadline';
+                    } else if (daysUntil <= 90) {
+                        deadlineInfo = `${daysUntil} days left`;
+                        deadlineClass = 'grant-deadline upcoming';
+                    } else {
+                        deadlineInfo = `${daysUntil} days left`;
+                        deadlineClass = 'grant-deadline far';
+                    }
+                } catch (e) {
+                    deadlineInfo = escapeHtml(grant.close_date || grant.deadline);
+                    deadlineClass = 'grant-deadline far';
+                }
+            }
+
+            const phase = grant.phase ? ` • Phase ${grant.phase}` : '';
+            const status = grant.current_status ? ` • ${grant.current_status}` : '';
+
+            return `
+                <div class="${cardClass}" data-item-id="${grant.id}">
+                    <div class="relevance-score">${grant.relevance_score?.toFixed(1) || '0.0'}</div>
+                    <span class="grant-type-badge badge-solicitation">📋 Solicitation</span>
+                    <h3 class="grant-title">${escapeHtml(grant.title || grant.solicitation_title || 'Untitled Solicitation')}</h3>
+                    <div class="grant-meta">
+                        <span class="grant-agency">${escapeHtml(grant.agency || 'Unknown Agency')}</span>
+                        ${deadlineInfo ? `<span class="${deadlineClass}">${deadlineInfo}</span>` : ''}
+                        ${phase ? `<span>${phase}</span>` : ''}
+                        ${status ? `<span>${status}</span>` : ''}
+                        <span>ID: ${escapeHtml(grant.funding_opportunity_number || grant.solicitation_number || 'N/A')}</span>
+                    </div>
+                    <div class="grant-description">
+                        ${escapeHtml(description)}
+                    </div>
+                    ${keywords.length > 0 ? `
+                        <div class="grant-keywords">
+                            ${keywords.map(keyword => `<span class="keyword-tag">${escapeHtml(keyword.trim())}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    <div class="grant-actions">
+                        <button class="action-btn btn-apply" onclick="viewItemDetails(${grant.id}, 'solicitation')">
+                            📝 Apply Now
+                        </button>
+                        ${grant.url || grant.solicitation_agency_url ? `<a href="${escapeHtml(grant.url || grant.solicitation_agency_url)}" target="_blank" class="action-btn btn-secondary">🔗 Official Page</a>` : ''}
+                        <button class="action-btn btn-secondary" onclick="findSimilarSolicitations(${grant.id})">
+                            🔍 Find Similar
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createCompanyCard(grant, cardClass) {
+            const keywords = grant.keywords ? grant.keywords.split(',').slice(0, 5) : [];
+            const description = grant.description ? 
+                (grant.description.length > 300 ? grant.description.substring(0, 300) + '...' : grant.description) 
+                : 'No description available';
+
+            const companyName = grant.company_name || grant.firm || grant.title;
+            const location = [grant.company_city, grant.company_state].filter(Boolean).join(', ') || grant.city && grant.state ? `${grant.city}, ${grant.state}` : '';
+            const totalFunding = grant.amount_max || grant.award_amount || 0;
+            const employees = grant.number_employees ? `${grant.number_employees} employees` : '';
+            
+            // Company characteristics
+            const characteristics = [];
+            if (grant.women_owned === true || grant.women_owned === 'Y') characteristics.push('Women-owned');
+            if (grant.hubzone_owned === true || grant.hubzone_owned === 'Y') characteristics.push('HUBZone');
+            if (grant.socially_economically_disadvantaged === true || grant.socially_economically_disadvantaged === 'Y') characteristics.push('SED');
+
+            return `
+                <div class="${cardClass}" data-item-id="${grant.id}">
+                    <div class="relevance-score">${grant.relevance_score?.toFixed(1) || '0.0'}</div>
+                    <span class="grant-type-badge badge-company">🏢 Company</span>
+                    <h3 class="grant-title">${escapeHtml(companyName || 'Unknown Company')}</h3>
+                    <div class="grant-meta">
+                        <span class="grant-agency">${escapeHtml(grant.agency || 'Multiple Agencies')}</span>
+                        ${totalFunding > 0 ? `<span class="grant-amount">${formatNumber(totalFunding)} received</span>` : ''}
+                        ${location ? `<span>📍 ${escapeHtml(location)}</span>` : ''}
+                        ${employees ? `<span>👥 ${employees}</span>` : ''}
+                        ${grant.uei || grant.company_uei ? `<span>UEI: ${escapeHtml(grant.uei || grant.company_uei)}</span>` : ''}
+                    </div>
+                    ${characteristics.length > 0 ? `
+                        <div class="grant-keywords">
+                            ${characteristics.map(char => `<span class="keyword-tag">${char}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    <div class="grant-description">
+                        ${escapeHtml(description)}
+                    </div>
+                    ${keywords.length > 0 ? `
+                        <div class="grant-keywords">
+                            ${keywords.map(keyword => `<span class="keyword-tag">${escapeHtml(keyword.trim())}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    <div class="grant-actions">
+                        <button class="action-btn btn-primary" onclick="viewItemDetails(${grant.id}, 'company')">
+                            🏢 Company Profile
+                        </button>
+                        ${grant.company_url ? `<a href="${escapeHtml(grant.company_url)}" target="_blank" class="action-btn btn-secondary">🌐 Website</a>` : ''}
+                        <button class="action-btn btn-secondary" onclick="findCompanyAwards(${grant.id})">
+                            🏆 View Awards
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('search-btn').disabled = true;
+            document.getElementById('search-btn').textContent = 'Searching...';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('search-btn').disabled = false;
+            document.getElementById('search-btn').textContent = '🔍 Find Grants';
+        }
+
+        function hideResults() {
+            document.getElementById('results-section').style.display = 'none';
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(0) + 'K';
+            }
+            return num.toLocaleString();
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/stats`);
+                if (response.ok) {
+                    const stats = await response.json();
+                    
+                    // Update stats with type-specific counts
+                    document.getElementById('total-awards').textContent = stats.awards_count || stats.total_grants || 0;
+                    document.getElementById('total-solicitations').textContent = stats.solicitations_count || 0;
+                    document.getElementById('total-companies').textContent = stats.companies_count || 0;
+                } else {
+                    console.error('Failed to load stats:', response.status);
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        // Enhanced interaction functions
+        function viewItemDetails(itemId, itemType) {
+            showNotification(`Opening ${itemType} details...`);
+            // This would open a detailed view modal or navigate to a detail page
+        }
+
+        function findSimilarAwards(awardId) {
+            showNotification('Finding similar awards...');
+            // This would perform a search for similar awards
+        }
+
+        function findSimilarSolicitations(solicitationId) {
+            showNotification('Finding similar opportunities...');
+            // This would perform a search for similar solicitations
+        }
+
+        function findCompanyAwards(companyId) {
+            showNotification('Loading company award history...');
+            // This would show all awards received by this company
+        }
+    </script>
+</body>
+</html>

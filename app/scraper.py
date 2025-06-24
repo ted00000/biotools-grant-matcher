@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Complete Final SBIR/STTR Scraper - All Fixes Applied
-- Headers fix: ✅ Proper browser-like headers to avoid 403 errors
-- Solicitations API: ✅ Follows exact API specifications (max 50 rows)
-- Rate limiting: ✅ Proper delays and respectful API usage
-- Error handling: ✅ Comprehensive logging and recovery
-- Database schema: ✅ Dynamic column handling for all environments
-- FIXED: Moved biotools keywords to __init__ method ✅
+Enhanced BioTools SBIR/STTR Scraper - Precision Biotools Focus
+Key improvements:
+- Compound biotools keyword strategy (e.g., "spatial biology" not "spatial")
+- Domain-specific negative filtering to exclude non-biotools
+- Agency/program pre-filtering for biotools-relevant funding
+- Enhanced relevance scoring with biotools taxonomy alignment
+- Reduced false positives from astronomy, geology, and general engineering
 """
 
 import requests
@@ -15,18 +15,19 @@ from datetime import datetime, timedelta
 import time
 import os
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 import logging
+import re
 
-class SBIRScraper:
+class EnhancedBiotoolsScraper:
     def __init__(self, db_path="data/grants.db"):
         self.db_path = db_path
         self.base_url = "https://api.www.sbir.gov/public/api"
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         
-        # 🔧 CRITICAL FIX: Browser-like headers to avoid 403 Forbidden
+        # Enhanced headers for better API access
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (compatible; BiotoolsGrantMatcher/1.0; +https://biotools.example.com)',
+            'User-Agent': 'Mozilla/5.0 (compatible; BiotoolsResearchMatcher/2.0; +https://biotools.research.edu)',
             'Accept': 'application/json, text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate, br',
@@ -45,113 +46,167 @@ class SBIRScraper:
             ]
         )
         self.logger = logging.getLogger(__name__)
-        
-        # Create logs directory
         os.makedirs('logs', exist_ok=True)
         
-        # FIXED: Moved biotools keywords inside __init__ method
-        self.biotools_keywords = [
-            # Physical Instruments (highest priority)
-            'microscope', 'microscopy', 'spectrometer', 'spectrometry', 'sequencer', 'sequencing',
-            'cytometer', 'analyzer', 'imaging system', 'detection system', 'scanner', 'reader',
-            'chromatography', 'electrophoresis', 'mass spectrometry', 'flow cytometry',
+        # PRECISION BIOTOOLS KEYWORD STRATEGY
+        # Using compound terms to ensure biological context
+        self.biotools_compound_keywords = [
+            # Genomics & Molecular Biology (compound terms only)
+            'genomic sequencing', 'DNA sequencing', 'RNA sequencing', 'genome editing',
+            'CRISPR technology', 'genetic analysis', 'molecular diagnostics', 'gene expression',
+            'single cell genomics', 'whole genome sequencing', 'targeted sequencing',
             
-            # Software & Computational Tools
-            'software', 'algorithm', 'pipeline', 'bioinformatics tool', 'analysis software',
-            'computational tool', 'modeling software', 'data analysis', 'visualization tool',
+            # Cell Biology & Microscopy
+            'cell biology', 'cellular imaging', 'live cell imaging', 'fluorescence microscopy',
+            'confocal microscopy', 'super resolution microscopy', 'cell sorting', 'flow cytometry',
+            'single cell analysis', 'cell culture', 'stem cell research',
             
-            # Assays & Test Methods
-            'assay', 'test kit', 'reagent', 'probe', 'antibody', 'pcr', 'qpcr', 'elisa',
-            'immunoassay', 'biosensor', 'diagnostic test', 'biomarker assay',
+            # Proteomics & Biochemistry
+            'protein analysis', 'mass spectrometry proteomics', 'protein identification',
+            'peptide analysis', 'enzyme assay', 'biochemical analysis', 'immunoassay',
+            'protein purification', 'protein characterization',
             
-            # Platforms & Systems
-            'platform', 'system', 'workstation', 'microfluidic', 'lab-on-chip',
-            'automated system', 'robotic system', 'screening platform', 'high-throughput',
+            # Bioinformatics & Computational Biology
+            'bioinformatics software', 'computational biology', 'sequence analysis',
+            'phylogenetic analysis', 'structural bioinformatics', 'systems biology',
+            'biological database', 'genomic data analysis', 'protein modeling',
             
-            # Focus Areas (biotools applications)
-            'single cell', 'genomics', 'proteomics', 'metabolomics', 'spatial biology',
-            'cell biology', 'molecular biology', 'bioinformatics', 'immunology',
+            # Laboratory Instrumentation (biological context)
+            'laboratory automation', 'bioanalytical instrument', 'clinical diagnostics',
+            'point-of-care testing', 'medical diagnostic', 'biological sensor',
+            'laboratory equipment', 'analytical instrumentation',
             
-            # Product Development (all phases)
-            'prototype', 'commercialize', 'manufacturing', 'clinical validation',
-            'product development', 'innovation', 'phase i', 'phase ii'
+            # Specialized Biotools Areas
+            'spatial biology', 'spatial transcriptomics', 'tissue imaging', 'pathology imaging',
+            'drug discovery', 'pharmaceutical research', 'biomarker discovery',
+            'clinical laboratory', 'diagnostic testing', 'therapeutic development',
+            
+            # Microfluidics & Lab-on-Chip (biological applications)
+            'microfluidic device', 'lab-on-chip', 'droplet microfluidics', 'biological microfluidics',
+            'cell manipulation', 'biological sample preparation',
+            
+            # Synthetic Biology & Bioengineering
+            'synthetic biology', 'bioengineering', 'biological engineering', 'biosynthesis',
+            'metabolic engineering', 'protein engineering', 'genetic engineering',
+            
+            # Multi-omics & Systems Approaches
+            'multi-omics', 'systems biology', 'integrative biology', 'personalized medicine',
+            'precision medicine', 'biomedical research', 'translational research',
+            
+            # Emerging Biotools Areas
+            'organoid technology', 'tissue engineering', 'regenerative medicine',
+            'immunotherapy', 'cancer research', 'neuroscience research',
+            'microbiome analysis', 'environmental microbiology'
         ]
+        
+        # NEGATIVE FILTERING - Domains to exclude
+        self.excluded_domains = {
+            'astronomy_space': [
+                'stellar', 'galactic', 'planetary', 'astronomical', 'astrophysics',
+                'space mission', 'satellite', 'cosmic', 'solar system', 'interstellar',
+                'telescope', 'observatory', 'space exploration'
+            ],
+            'geology_earth_science': [
+                'geological', 'geophysical', 'seismic', 'tectonic', 'volcanic',
+                'sedimentary', 'igneous', 'metamorphic', 'mineral exploration',
+                'geochemistry', 'petrology', 'stratigraphy', 'paleontology'
+            ],
+            'physics_non_bio': [
+                'particle physics', 'quantum mechanics', 'nuclear physics', 'theoretical physics',
+                'condensed matter physics', 'plasma physics', 'high energy physics',
+                'atomic physics', 'optics research', 'materials physics'
+            ],
+            'engineering_non_bio': [
+                'mechanical engineering', 'electrical engineering', 'civil engineering',
+                'aerospace engineering', 'chemical engineering', 'industrial engineering',
+                'structural engineering', 'automotive engineering'
+            ],
+            'environmental_non_bio': [
+                'climate modeling', 'atmospheric science', 'meteorology', 'oceanography',
+                'hydrology', 'remote sensing', 'earth observation', 'weather prediction'
+            ],
+            'computer_science_general': [
+                'web development', 'mobile application', 'database administration',
+                'network security', 'cloud computing', 'machine learning general',
+                'artificial intelligence general', 'software engineering'
+            ],
+            'chemistry_non_bio': [
+                'inorganic chemistry', 'physical chemistry', 'materials chemistry',
+                'industrial chemistry', 'polymer chemistry', 'analytical chemistry'
+            ]
+        }
+        
+        # BIOTOOLS-SPECIFIC AGENCIES AND PROGRAMS
+        self.biotools_agencies = {
+            'HHS': {
+                'programs': ['SBIR', 'STTR', 'biomedical', 'health technology', 'medical device'],
+                'exclude_programs': ['social services', 'education', 'administration']
+            },
+            'NIH': {
+                'programs': ['biological', 'biomedical', 'health', 'disease', 'therapeutic', 'diagnostic'],
+                'exclude_programs': ['behavioral', 'social', 'educational']
+            },
+            'NSF': {
+                'programs': ['biological sciences', 'molecular', 'cellular', 'biological research',
+                           'biotechnology', 'biochemistry', 'biophysics'],
+                'exclude_programs': ['social sciences', 'education', 'geosciences', 'engineering general']
+            },
+            'DOE': {
+                'programs': ['biological systems', 'bioenergy', 'environmental biology',
+                           'genomics', 'systems biology'],
+                'exclude_programs': ['fossil energy', 'nuclear energy', 'renewable energy general']
+            },
+            'CDC': {
+                'programs': ['health surveillance', 'epidemiology', 'public health tools',
+                           'diagnostic tools', 'health monitoring'],
+                'exclude_programs': ['policy', 'administration', 'education']
+            },
+            'DARPA': {
+                'programs': ['biological technologies', 'biotechnology', 'biodefense',
+                           'biological systems', 'bioengineering'],
+                'exclude_programs': ['weapons', 'defense general', 'communications']
+            }
+        }
         
         self.setup_database()
     
     def setup_database(self):
-        """Create enhanced database schema for SBIR/STTR data"""
+        """Create enhanced database schema optimized for biotools data"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Check if grants table exists and what columns it has
+        # Check existing table and add biotools-specific columns
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='grants';")
         grants_exists = cursor.fetchone()
         
         if grants_exists:
-            # Get existing columns
             cursor.execute("PRAGMA table_info(grants);")
             existing_columns = {row[1]: row[2] for row in cursor.fetchall()}
             self.logger.info(f"Found existing grants table with {len(existing_columns)} columns")
             
-            # Add missing SBIR columns to existing table
-            new_columns = {
-                'branch': 'TEXT',
-                'phase': 'TEXT', 
-                'program': 'TEXT',
-                'agency_tracking_number': 'TEXT',
-                'contract_number': 'TEXT',
-                'proposal_award_date': 'DATE',
-                'contract_end_date': 'DATE',
-                'solicitation_number': 'TEXT',
-                'solicitation_year': 'INTEGER',
-                'topic_code': 'TEXT',
-                'award_year': 'INTEGER',
-                'award_amount': 'INTEGER',
-                'company_name': 'TEXT',
-                'company_uei': 'TEXT',
-                'company_duns': 'TEXT',
-                'company_address': 'TEXT',
-                'company_city': 'TEXT',
-                'company_state': 'TEXT',
-                'company_zip': 'TEXT',
-                'company_url': 'TEXT',
-                'hubzone_owned': 'BOOLEAN',
-                'socially_economically_disadvantaged': 'BOOLEAN',
-                'women_owned': 'BOOLEAN',
-                'number_employees': 'INTEGER',
-                'poc_name': 'TEXT',
-                'poc_title': 'TEXT',
-                'poc_phone': 'TEXT',
-                'poc_email': 'TEXT',
-                'pi_name': 'TEXT',
-                'pi_phone': 'TEXT',
-                'pi_email': 'TEXT',
-                'ri_name': 'TEXT',
-                'ri_poc_name': 'TEXT',
-                'ri_poc_phone': 'TEXT',
-                'data_source': 'TEXT DEFAULT "SBIR"',
-                'grant_type': 'TEXT',
-                'current_status': 'TEXT',
-                'relevance_score': 'REAL DEFAULT 0.0',
-                'open_date': 'DATE',
-                'close_date': 'DATE',
-                'solicitation_topics': 'TEXT',
-                'biotools_category': 'TEXT',
-                'last_scraped_at': 'TEXT'
+            # Add biotools-specific columns
+            biotools_columns = {
+                'biotools_compound_keywords': 'TEXT',
+                'biotools_relevance_score': 'REAL DEFAULT 0.0',
+                'biotools_validated': 'BOOLEAN DEFAULT 0',
+                'excluded_domain_flags': 'TEXT',
+                'biotools_tool_type': 'TEXT',
+                'biotools_focus_area': 'TEXT',
+                'negative_filter_score': 'REAL DEFAULT 0.0',
+                'compound_keyword_matches': 'TEXT'
             }
             
-            for column_name, column_def in new_columns.items():
+            for column_name, column_def in biotools_columns.items():
                 if column_name not in existing_columns:
                     try:
                         cursor.execute(f"ALTER TABLE grants ADD COLUMN {column_name} {column_def}")
-                        self.logger.info(f"Added column: {column_name}")
+                        self.logger.info(f"Added biotools column: {column_name}")
                     except sqlite3.Error as e:
                         if "duplicate column name" not in str(e).lower():
                             self.logger.warning(f"Could not add column {column_name}: {e}")
         else:
-            # Create new grants table with full SBIR schema
-            self.logger.info("Creating new grants table with full SBIR schema")
+            # Create new table with full biotools schema
+            self.logger.info("Creating new grants table with enhanced biotools schema")
             cursor.execute('''
                 CREATE TABLE grants (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -169,7 +224,7 @@ class SBIRScraper:
                     eligibility TEXT,
                     url TEXT,
                     
-                    -- SBIR-specific fields
+                    -- SBIR/STTR specific fields
                     agency_tracking_number TEXT,
                     contract_number TEXT,
                     proposal_award_date DATE,
@@ -202,11 +257,19 @@ class SBIRScraper:
                     pi_name TEXT,
                     pi_phone TEXT,
                     pi_email TEXT,
-                    
-                    -- Research institution (STTR)
                     ri_name TEXT,
                     ri_poc_name TEXT,
                     ri_poc_phone TEXT,
+                    
+                    -- Enhanced biotools fields
+                    biotools_compound_keywords TEXT,
+                    biotools_relevance_score REAL DEFAULT 0.0,
+                    biotools_validated BOOLEAN DEFAULT 0,
+                    excluded_domain_flags TEXT,
+                    biotools_tool_type TEXT,
+                    biotools_focus_area TEXT,
+                    negative_filter_score REAL DEFAULT 0.0,
+                    compound_keyword_matches TEXT,
                     
                     -- Metadata
                     data_source TEXT DEFAULT 'SBIR',
@@ -225,56 +288,108 @@ class SBIRScraper:
         
         conn.commit()
         conn.close()
-        self.logger.info("Database schema initialized successfully")
+        self.logger.info("Enhanced biotools database schema initialized successfully")
     
-    def is_biotools_relevant(self, text: str) -> bool:
-        """Check if content is relevant to biotools/life sciences"""
-        if not text:
-            return False
-        
-        text_lower = text.lower()
-        return any(keyword in text_lower for keyword in self.biotools_keywords)
-    
-    def calculate_biotools_relevance_score(self, title: str, description: str, keywords: str = "") -> float:
-        """Calculate relevance score for biotools applications"""
-        score = 0.0
+    def is_biotools_relevant(self, title: str, description: str = "", keywords: str = "") -> Dict[str, Any]:
+        """Enhanced biotools relevance detection with precision focus"""
         combined_text = f"{title} {description} {keywords}".lower()
         
-        # High-value biotools terms (higher weight)
-        high_value_terms = [
-            'diagnostic', 'biomarker', 'medical device', 'biosensor', 'microfluidics',
-            'lab-on-chip', 'point-of-care', 'sequencing', 'genomics', 'proteomics',
-            'clinical trial', 'pharmaceutical', 'therapeutic'
-        ]
+        relevance_data = {
+            'is_relevant': False,
+            'relevance_score': 0.0,
+            'matched_keywords': [],
+            'excluded_domains': [],
+            'negative_score': 0.0,
+            'tool_type_suggestions': [],
+            'focus_area_suggestions': []
+        }
         
-        # Medium-value terms
-        medium_value_terms = [
-            'laboratory', 'instrumentation', 'microscopy', 'biotechnology',
-            'analytical', 'automation', 'imaging', 'molecular', 'biomedical'
-        ]
+        # Check for compound biotools keywords (positive scoring)
+        matched_compounds = []
+        for compound_keyword in self.biotools_compound_keywords:
+            if compound_keyword.lower() in combined_text:
+                matched_compounds.append(compound_keyword)
+                relevance_data['relevance_score'] += 2.0  # Higher weight for compound terms
         
-        # Count matches and weight them
-        for term in high_value_terms:
-            if term in combined_text:
-                score += 3.0
+        relevance_data['matched_keywords'] = matched_compounds
         
-        for term in medium_value_terms:
-            if term in combined_text:
-                score += 1.5
+        # Check for excluded domains (negative scoring)
+        excluded_matches = []
+        for domain_name, domain_terms in self.excluded_domains.items():
+            for term in domain_terms:
+                if term.lower() in combined_text:
+                    excluded_matches.append((domain_name, term))
+                    relevance_data['negative_score'] += 3.0  # Heavy penalty for excluded domains
         
-        # Additional scoring for biotools keywords
-        for keyword in self.biotools_keywords:
-            if keyword in combined_text:
-                score += 1.0
+        relevance_data['excluded_domains'] = excluded_matches
         
-        return min(score, 10.0)  # Cap at 10.0
-
+        # Calculate final relevance score
+        final_score = relevance_data['relevance_score'] - relevance_data['negative_score']
+        relevance_data['relevance_score'] = max(0.0, final_score)
+        
+        # Determine if relevant (must have positive compound matches and minimal exclusions)
+        relevance_data['is_relevant'] = (
+            len(matched_compounds) > 0 and 
+            relevance_data['relevance_score'] > 2.0 and
+            len(excluded_matches) <= 1  # Allow minimal false positives
+        )
+        
+        # Suggest tool types and focus areas based on matches
+        relevance_data['tool_type_suggestions'] = self._suggest_tool_types(matched_compounds)
+        relevance_data['focus_area_suggestions'] = self._suggest_focus_areas(matched_compounds)
+        
+        return relevance_data
+    
+    def _suggest_tool_types(self, matched_keywords: List[str]) -> List[str]:
+        """Suggest biotools tool types based on matched keywords"""
+        tool_type_mappings = {
+            'instrument': ['sequencing', 'microscopy', 'cytometry', 'spectrometry', 'imaging', 'automation'],
+            'software': ['bioinformatics software', 'computational biology', 'analysis', 'modeling'],
+            'assay': ['assay', 'testing', 'diagnostic', 'immunoassay', 'biochemical analysis'],
+            'database_platform': ['database', 'repository', 'platform', 'resource'],
+            'integrated_system': ['automation', 'platform', 'system', 'workstation'],
+            'service': ['service', 'facility', 'laboratory'],
+            'consumable': ['reagent', 'kit', 'supplies', 'media']
+        }
+        
+        suggestions = []
+        for tool_type, indicators in tool_type_mappings.items():
+            for keyword in matched_keywords:
+                if any(indicator in keyword.lower() for indicator in indicators):
+                    if tool_type not in suggestions:
+                        suggestions.append(tool_type)
+        
+        return suggestions
+    
+    def _suggest_focus_areas(self, matched_keywords: List[str]) -> List[str]:
+        """Suggest biotools focus areas based on matched keywords"""
+        focus_area_mappings = {
+            'genomics': ['genomic', 'DNA', 'gene', 'sequencing', 'CRISPR'],
+            'cell_biology': ['cell', 'cellular', 'microscopy', 'imaging'],
+            'proteomics': ['protein', 'peptide', 'mass spectrometry'],
+            'bioinformatics': ['bioinformatics', 'computational', 'analysis'],
+            'single_cell': ['single cell', 'droplet', 'microfluidic'],
+            'spatial_biology': ['spatial', 'tissue', 'pathology'],
+            'immunology': ['immune', 'antibody', 'immunoassay'],
+            'synthetic_biology': ['synthetic biology', 'bioengineering'],
+            'diagnostics': ['diagnostic', 'clinical', 'point-of-care'],
+            'microbiome': ['microbiome', 'microbial', '16S']
+        }
+        
+        suggestions = []
+        for focus_area, indicators in focus_area_mappings.items():
+            for keyword in matched_keywords:
+                if any(indicator in keyword.lower() for indicator in indicators):
+                    if focus_area not in suggestions:
+                        suggestions.append(focus_area)
+        
+        return suggestions
+    
     def make_api_request(self, endpoint: str, params: Dict[str, Any] = None, max_retries: int = 3) -> Optional[List]:
-        """Make API request with enhanced error handling and correct endpoint routing."""
-        # Determine URL and whether to use params
+        """Enhanced API request with biotools-specific error handling"""
         if endpoint == "solicitations":
             url = "https://api.www.sbir.gov/public/api/solicitations"
-            use_params = False  # Drop all params for solicitations
+            use_params = False
         else:
             url = f"{self.base_url}/{endpoint}"
             use_params = True
@@ -284,57 +399,57 @@ class SBIRScraper:
 
         for attempt in range(max_retries):
             try:
-                # Only pass params if allowed
                 response = requests.get(
                     url,
                     headers=self.headers,
                     params=params if use_params else None,
                     timeout=30
                 )
-                self.logger.debug(f"Requesting {response.url} → {response.status_code}")
+                
+                self.logger.debug(f"API request: {response.url} → {response.status_code}")
 
                 if response.status_code == 200:
                     try:
                         data = response.json()
                         return data if isinstance(data, list) else []
                     except json.JSONDecodeError as e:
-                        self.logger.error("JSON decode error:", e)
+                        self.logger.error(f"JSON decode error: {e}")
                         return None
 
                 if response.status_code in (403, 404):
-                    self.logger.warning(f"{response.status_code} for {response.url}")
+                    self.logger.warning(f"API endpoint unavailable: {response.status_code} for {response.url}")
                     return None
 
                 if response.status_code == 429:
-                    wait = (attempt + 1) * 15
-                    self.logger.warning(f"429 rate limit — retrying in {wait}s")
-                    time.sleep(wait)
+                    wait_time = (attempt + 1) * 15
+                    self.logger.warning(f"Rate limited - waiting {wait_time}s before retry")
+                    time.sleep(wait_time)
                     continue
 
-                self.logger.error(f"Unknown status {response.status_code} at {response.url}")
+                self.logger.error(f"Unexpected API response: {response.status_code} for {response.url}")
                 return None
 
             except requests.RequestException as e:
-                self.logger.error(f"Request exception on attempt {attempt + 1}: {e}")
+                self.logger.error(f"API request failed (attempt {attempt + 1}): {e}")
                 if attempt < max_retries - 1:
                     time.sleep(10)
 
-        self.logger.error("Max retries exceeded")
+        self.logger.error("API request failed after all retries")
         return None
-
     
-    def fetch_awards_by_agency(self, agency: str, start_year: int = 2020) -> List[Dict]:
-        """Fetch awards from specific agency with biotools filtering"""
-        self.logger.info(f"Fetching {agency} awards from {start_year}...")
+    def fetch_biotools_awards_by_agency(self, agency: str, start_year: int = 2020) -> List[Dict]:
+        """Fetch awards with enhanced biotools compound keyword filtering"""
+        self.logger.info(f"Fetching {agency} biotools awards from {start_year} with compound keywords...")
         
         awards = []
-        rows_per_request = 1000  # Maximum for awards API
+        rows_per_request = 1000
         current_year = datetime.now().year
         
         for year in range(start_year, current_year + 1):
-            self.logger.info(f"  Fetching {agency} awards for {year}...")
+            self.logger.info(f"  Processing {agency} awards for {year}...")
             year_start = 0
-            year_awards = 0
+            year_biotools_count = 0
+            year_total_count = 0
             
             while True:
                 params = {
@@ -354,147 +469,105 @@ class SBIRScraper:
                 if not batch_awards:
                     break
                 
-                # Filter for biotools relevance
-                relevant_awards = []
+                year_total_count += len(batch_awards)
+                
+                # Enhanced biotools filtering with compound keywords
                 for award in batch_awards:
                     title = award.get('award_title', '')
                     abstract = award.get('abstract', '')
                     keywords = award.get('research_area_keywords', '') or ''
                     
-                    combined_text = f"{title} {abstract} {keywords}"
+                    relevance_data = self.is_biotools_relevant(title, abstract, keywords)
                     
-                    if self.is_biotools_relevant(combined_text):
-                        award['relevance_score'] = self.calculate_biotools_relevance_score(title, abstract, keywords)
-                        relevant_awards.append(award)
+                    if relevance_data['is_relevant']:
+                        # Enhance award with biotools metadata
+                        award['biotools_relevance_score'] = relevance_data['relevance_score']
+                        award['biotools_validated'] = True
+                        award['compound_keyword_matches'] = ','.join(relevance_data['matched_keywords'])
+                        award['biotools_tool_type'] = ','.join(relevance_data['tool_type_suggestions'])
+                        award['biotools_focus_area'] = ','.join(relevance_data['focus_area_suggestions'])
+                        award['excluded_domain_flags'] = ','.join([f"{domain}:{term}" for domain, term in relevance_data['excluded_domains']])
+                        award['negative_filter_score'] = relevance_data['negative_score']
+                        
+                        awards.append(award)
+                        year_biotools_count += 1
                 
-                awards.extend(relevant_awards)
-                year_awards += len(batch_awards)
-                self.logger.info(f"    Batch: {len(batch_awards)} total, {len(relevant_awards)} biotools-relevant")
+                self.logger.info(f"    Batch processed: {len(batch_awards)} awards, {year_biotools_count} biotools-relevant so far")
                 
-                # If we got fewer results than requested, we're done with this year
                 if len(batch_awards) < rows_per_request:
                     break
                 
                 year_start += rows_per_request
-                time.sleep(2)  # Longer delays to be more respectful
+                time.sleep(2)  # Respectful delay
             
-            self.logger.info(f"  {agency} {year}: {year_awards} total awards processed")
+            relevance_rate = (year_biotools_count / year_total_count * 100) if year_total_count > 0 else 0
+            self.logger.info(f"  {agency} {year}: {year_biotools_count}/{year_total_count} biotools-relevant ({relevance_rate:.1f}%)")
         
-        self.logger.info(f"✅ {agency}: Collected {len(awards)} biotools-relevant awards")
+        self.logger.info(f"✅ {agency}: Collected {len(awards)} precision biotools awards")
         return awards
     
-    def fetch_open_solicitations(self) -> List[Dict]:
-        """🔧 FIXED: API-compliant solicitations fetching following exact specifications"""
-        self.logger.info("🔍 Fetching SBIR Solicitations (API Specification Compliant)")
+    def fetch_biotools_solicitations(self) -> List[Dict]:
+        """Fetch solicitations with enhanced biotools filtering"""
+        self.logger.info("🔍 Fetching SBIR Solicitations with Biotools Compound Keywords")
         
         all_solicitations = []
         
-        # Strategy 1: Direct open solicitations (API spec: max 50 rows, default 25)
-        self.logger.info("  Strategy 1: Open solicitations (API limits)")
-        try:
-            # Try with API documented default limit first
-            params = {
-                'open': 1,
-                'rows': 25,  # API documented default
-                'format': 'json'
-            }
-            
-            data = self.make_api_request('solicitations', params)
-            if data and isinstance(data, list):
-                self.logger.info(f"    ✅ Found {len(data)} open solicitations (25 rows)")
-                all_solicitations.extend(data)
-            else:
-                self.logger.info("    ❌ No open solicitations found (25 rows)")
-                
-                # Try with maximum API limit
-                self.logger.info("    🔄 Trying maximum API limit...")
-                params['rows'] = 50  # API documented maximum
-                
-                data = self.make_api_request('solicitations', params)
-                if data and isinstance(data, list):
-                    self.logger.info(f"    ✅ Found {len(data)} open solicitations (50 rows)")
-                    all_solicitations.extend(data)
-                else:
-                    self.logger.info("    ❌ No open solicitations found (50 rows)")
-            
-            time.sleep(3)  # Longer delay after solicitations requests
-            
-        except Exception as e:
-            self.logger.warning(f"    ❌ Open solicitations strategy failed: {e}")
-        
-        # Strategy 2: Agency-specific open solicitations (API compliant)
-        self.logger.info("  Strategy 2: Agency-specific open solicitations")
-        biotools_agencies = ['HHS', 'NSF', 'DOD', 'DOE', 'NASA']
+        # Strategy 1: Direct open solicitations with biotools agencies
+        self.logger.info("  Strategy 1: Open solicitations from biotools agencies")
+        biotools_agencies = ['HHS', 'NIH', 'NSF', 'DOE', 'CDC']
         
         for agency in biotools_agencies:
+            # Check if agency has biotools programs
+            if agency in self.biotools_agencies:
+                try:
+                    params = {
+                        'agency': agency,
+                        'open': 1,
+                        'rows': 25,
+                        'format': 'json'
+                    }
+                    
+                    data = self.make_api_request('solicitations', params)
+                    if data and isinstance(data, list):
+                        self.logger.info(f"    {agency}: {len(data)} open solicitations")
+                        all_solicitations.extend(data)
+                    else:
+                        self.logger.info(f"    {agency}: No open solicitations")
+                    
+                    time.sleep(2)
+                    
+                except Exception as e:
+                    self.logger.warning(f"    {agency} solicitations failed: {e}")
+        
+        # Strategy 2: Compound keyword-based search
+        self.logger.info("  Strategy 2: Biotools compound keyword search")
+        biotools_search_terms = [
+            'genomic sequencing', 'cell biology', 'protein analysis', 'bioinformatics software',
+            'diagnostic testing', 'laboratory automation', 'biomarker discovery', 'drug discovery'
+        ]
+        
+        for term in biotools_search_terms:
             try:
                 params = {
-                    'agency': agency,
+                    'keyword': term,
                     'open': 1,
-                    'rows': 25,  # Conservative API limit
+                    'rows': 10,
                     'format': 'json'
                 }
                 
                 data = self.make_api_request('solicitations', params)
                 if data and isinstance(data, list):
-                    self.logger.info(f"    ✅ {agency}: {len(data)} open solicitations")
+                    self.logger.info(f"    '{term}': {len(data)} open solicitations")
                     all_solicitations.extend(data)
                 else:
-                    self.logger.info(f"    ❌ {agency}: No open solicitations")
+                    self.logger.info(f"    '{term}': No solicitations")
                 
-                time.sleep(2)  # Respectful delay between agencies
-                
-            except Exception as e:
-                self.logger.warning(f"    ❌ {agency} open solicitations failed: {e}")
-        
-        # Strategy 3: Keyword-based open solicitations (API compliant)
-        self.logger.info("  Strategy 3: Keyword-based open solicitations")
-        biotools_keywords = ['biotech', 'medical', 'diagnostic', 'laboratory', 'biosensor']
-        
-        for keyword in biotools_keywords:
-            try:
-                params = {
-                    'keyword': keyword,
-                    'open': 1,
-                    'rows': 25,  # Conservative API limit
-                    'format': 'json'
-                }
-                
-                data = self.make_api_request('solicitations', params)
-                if data and isinstance(data, list):
-                    self.logger.info(f"    ✅ '{keyword}': {len(data)} open solicitations")
-                    all_solicitations.extend(data)
-                else:
-                    self.logger.info(f"    ❌ '{keyword}': No open solicitations")
-                
-                time.sleep(1.5)  # Respectful delay between keywords
+                time.sleep(1.5)
                 
             except Exception as e:
-                self.logger.warning(f"    ❌ Keyword '{keyword}' search failed: {e}")
+                self.logger.warning(f"    Keyword '{term}' search failed: {e}")
         
-        # Strategy 4: Recent solicitations without open filter (fallback, API compliant)
-        if len(all_solicitations) == 0:
-            self.logger.info("  Strategy 4: Recent solicitations (fallback)")
-            try:
-                params = {
-                    'rows': 50,  # API documented maximum
-                    'format': 'json'
-                }
-                
-                data = self.make_api_request('solicitations', params)
-                if data and isinstance(data, list):
-                    self.logger.info(f"    ✅ Found {len(data)} recent solicitations")
-                    # Filter for potentially open ones
-                    potential_open = self._filter_potentially_open_solicitations(data)
-                    self.logger.info(f"    📅 {len(potential_open)} appear to be open/recent")
-                    all_solicitations.extend(potential_open)
-                else:
-                    self.logger.info("    ❌ No recent solicitations found")
-                
-            except Exception as e:
-                self.logger.warning(f"    ❌ Recent solicitations failed: {e}")
-        
-        # Remove duplicates based on solicitation_number
+        # Remove duplicates and apply biotools filtering
         unique_solicitations = {}
         for sol in all_solicitations:
             sol_id = sol.get('solicitation_number') or sol.get('solicitation_id', '')
@@ -504,182 +577,42 @@ class SBIRScraper:
         unique_list = list(unique_solicitations.values())
         self.logger.info(f"  📊 Total unique solicitations: {len(unique_list)}")
         
-        # Filter for biotools relevance
-        relevant_solicitations = self._filter_biotools_solicitations(unique_list)
-        
-        self.logger.info(f"✅ Collected {len(relevant_solicitations)} biotools-relevant solicitations")
-        
-        if len(relevant_solicitations) == 0:
-            self.logger.warning("⚠️  NO BIOTOOLS SOLICITATIONS FOUND")
-            self.logger.warning("This could indicate:")
-            self.logger.warning("  • No biotools solicitations currently open")
-            self.logger.warning("  • API rate limiting after awards collection")
-            self.logger.warning("  • Temporary API issues")
-            self.logger.warning("  • Try running solicitations-only later")
-        
-        return relevant_solicitations
-    
-    def _filter_potentially_open_solicitations(self, solicitations: List[Dict]) -> List[Dict]:
-        """Filter for solicitations that might be open based on status and dates"""
-        potentially_open = []
-        current_date = datetime.now()
-        
-        for sol in solicitations:
-            # Check status
-            status = sol.get('current_status', '').lower()
-            if status in ['open', 'active', 'current']:
-                potentially_open.append(sol)
-                continue
-            
-            # Check close date
-            close_date_str = sol.get('close_date', '')
-            if close_date_str:
-                try:
-                    # Try to parse close date
-                    if 'T' in close_date_str:
-                        close_date = datetime.fromisoformat(close_date_str.replace('Z', '+00:00'))
-                    else:
-                        close_date = datetime.strptime(close_date_str.split('T')[0], '%Y-%m-%d')
-                    
-                    # If close date is in the future, consider it potentially open
-                    if close_date > current_date:
-                        potentially_open.append(sol)
-                        
-                except Exception:
-                    # If we can't parse the date, include it to be safe
-                    potentially_open.append(sol)
-        
-        return potentially_open
-    
-    def _filter_recent_solicitations(self, solicitations: List[Dict]) -> List[Dict]:
-        """Filter solicitations to only include recent ones"""
-        recent_solicitations = []
-        cutoff_date = datetime.now() - timedelta(days=180)  # Last 6 months
-        
-        for sol in solicitations:
-            is_recent = False
-            
-            # Check various date fields
-            for date_field in ['close_date', 'open_date', 'release_date']:
-                date_str = sol.get(date_field, '')
-                if date_str:
-                    try:
-                        # Try to parse the date
-                        if 'T' in date_str:  # ISO format
-                            sol_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                        else:  # Try common formats
-                            for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%B %d, %Y']:
-                                try:
-                                    sol_date = datetime.strptime(date_str, fmt)
-                                    break
-                                except ValueError:
-                                    continue
-                            else:
-                                continue  # Couldn't parse date
-                        
-                        if sol_date >= cutoff_date:
-                            is_recent = True
-                            break
-                            
-                    except Exception:
-                        continue
-            
-            # Also check if status indicates it's current
-            status = sol.get('current_status', '').lower()
-            if status in ['open', 'active', 'current']:
-                is_recent = True
-            
-            if is_recent:
-                recent_solicitations.append(sol)
-        
-        return recent_solicitations
-    
-    def _filter_biotools_solicitations(self, solicitations: List[Dict]) -> List[Dict]:
-        """Filter solicitations for biotools relevance"""
-        relevant_solicitations = []
-        
-        for sol in solicitations:
+        # Apply enhanced biotools filtering
+        biotools_solicitations = []
+        for sol in unique_list:
             title = sol.get('solicitation_title', '')
             
-            # Check topics for biotools relevance
+            # Extract description from topics
             topics_text = ""
             if 'solicitation_topics' in sol and sol['solicitation_topics']:
                 for topic in sol['solicitation_topics']:
                     if isinstance(topic, dict):
                         topics_text += f" {topic.get('topic_title', '')} {topic.get('topic_description', '')}"
             
-            combined_text = f"{title} {topics_text}"
+            relevance_data = self.is_biotools_relevant(title, topics_text)
             
-            if self.is_biotools_relevant(combined_text):
-                sol['relevance_score'] = self.calculate_biotools_relevance_score(title, topics_text)
-                relevant_solicitations.append(sol)
-        
-        return relevant_solicitations
-    
-    def fetch_biotools_companies(self) -> List[Dict]:
-        """Fetch companies with biotools-relevant awards"""
-        self.logger.info("Fetching biotools-relevant companies...")
-        
-        companies = []
-        
-        # Search for companies using biotools keywords
-        biotools_search_terms = [
-            'diagnostic', 'biomarker', 'medical device', 'biosensor',
-            'microfluidics', 'genomics', 'biotechnology', 'laboratory'
-        ]
-        
-        for term in biotools_search_terms:
-            self.logger.info(f"  Searching companies with keyword: {term}")
-            
-            start = 0
-            rows_per_request = 1000  # API allows up to 5000
-            
-            while True:
-                params = {
-                    'keyword': term,
-                    'start': start,
-                    'rows': rows_per_request,
-                    'format': 'json'
-                }
+            if relevance_data['is_relevant']:
+                # Enhance solicitation with biotools metadata
+                sol['biotools_relevance_score'] = relevance_data['relevance_score']
+                sol['biotools_validated'] = True
+                sol['compound_keyword_matches'] = ','.join(relevance_data['matched_keywords'])
+                sol['biotools_tool_type'] = ','.join(relevance_data['tool_type_suggestions'])
+                sol['biotools_focus_area'] = ','.join(relevance_data['focus_area_suggestions'])
                 
-                data = self.make_api_request('firm', params)
-                
-                if not data or not isinstance(data, list):
-                    break
-                
-                batch_companies = data
-                if not batch_companies:
-                    break
-                
-                companies.extend(batch_companies)
-                self.logger.info(f"    Found {len(batch_companies)} companies for '{term}'")
-                
-                if len(batch_companies) < rows_per_request:
-                    break
-                
-                start += rows_per_request
-                time.sleep(2)  # Respectful delay
+                biotools_solicitations.append(sol)
         
-        # Remove duplicates based on UEI
-        unique_companies = {}
-        for company in companies:
-            uei = company.get('uei')
-            if uei and uei not in unique_companies:
-                unique_companies[uei] = company
-        
-        companies = list(unique_companies.values())
-        self.logger.info(f"✅ Collected {len(companies)} unique biotools companies")
-        return companies
+        self.logger.info(f"✅ Collected {len(biotools_solicitations)} precision biotools solicitations")
+        return biotools_solicitations
     
     def save_awards(self, awards: List[Dict]) -> int:
-        """Save awards to database with dynamic column mapping"""
+        """Save awards with enhanced biotools metadata"""
         if not awards:
             return 0
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Get the actual table structure
+        # Get actual table structure
         cursor.execute("PRAGMA table_info(grants);")
         columns_info = cursor.fetchall()
         column_names = [col[1] for col in columns_info]
@@ -689,7 +622,6 @@ class SBIRScraper:
         
         for award in awards:
             try:
-                # Create a mapping of our data to available columns
                 award_data = {}
                 
                 # Basic fields
@@ -711,61 +643,56 @@ class SBIRScraper:
                 award_data['amount_min'] = 0
                 award_data['amount_max'] = amount
                 
-                # SBIR-specific fields (only add if columns exist)
-                if 'branch' in column_names:
-                    award_data['branch'] = award.get('branch', '')
-                if 'phase' in column_names:
-                    award_data['phase'] = award.get('phase', '')
-                if 'program' in column_names:
-                    award_data['program'] = award.get('program', '')
-                if 'award_year' in column_names:
-                    award_data['award_year'] = award.get('award_year', None)
-                if 'award_amount' in column_names:
-                    award_data['award_amount'] = amount
-                if 'contract_number' in column_names:
-                    award_data['contract_number'] = award.get('contract', '')
-                if 'company_name' in column_names:
-                    award_data['company_name'] = award.get('firm', '')
-                if 'company_city' in column_names:
-                    award_data['company_city'] = award.get('city', '')
-                if 'company_state' in column_names:
-                    award_data['company_state'] = award.get('state', '')
-                if 'company_uei' in column_names:
-                    award_data['company_uei'] = award.get('uei', '')
-                if 'company_duns' in column_names:
-                    award_data['company_duns'] = award.get('duns', '')
-                if 'company_address' in column_names:
-                    award_data['company_address'] = award.get('address1', '')
-                if 'company_zip' in column_names:
-                    award_data['company_zip'] = award.get('zip', '')
-                if 'poc_name' in column_names:
-                    award_data['poc_name'] = award.get('poc_name', '')
-                if 'pi_name' in column_names:
-                    award_data['pi_name'] = award.get('pi_name', '')
+                # Enhanced biotools fields (only add if columns exist)
+                biotools_fields = [
+                    'biotools_relevance_score', 'biotools_validated', 'compound_keyword_matches',
+                    'biotools_tool_type', 'biotools_focus_area', 'excluded_domain_flags', 'negative_filter_score'
+                ]
+                
+                for field in biotools_fields:
+                    if field in column_names and field in award:
+                        award_data[field] = award[field]
+                
+                # Standard SBIR fields (dynamic column handling)
+                standard_fields = {
+                    'branch': 'branch', 'phase': 'phase', 'program': 'program',
+                    'award_year': 'award_year', 'award_amount': 'award_amount',
+                    'contract_number': 'contract', 'company_name': 'firm',
+                    'company_city': 'city', 'company_state': 'state',
+                    'company_uei': 'uei', 'company_duns': 'duns',
+                    'company_address': 'address1', 'company_zip': 'zip',
+                    'poc_name': 'poc_name', 'pi_name': 'pi_name'
+                }
+                
+                for db_field, api_field in standard_fields.items():
+                    if db_field in column_names and api_field in award:
+                        award_data[db_field] = award[api_field]
                 
                 # Boolean fields
-                if 'hubzone_owned' in column_names:
-                    award_data['hubzone_owned'] = award.get('hubzone_owned') == 'Y'
-                if 'socially_economically_disadvantaged' in column_names:
-                    award_data['socially_economically_disadvantaged'] = award.get('socially_economically_disadvantaged') == 'Y'
-                if 'women_owned' in column_names:
-                    award_data['women_owned'] = award.get('women_owned') == 'Y'
+                boolean_fields = {
+                    'hubzone_owned': 'hubzone_owned',
+                    'socially_economically_disadvantaged': 'socially_economically_disadvantaged',
+                    'women_owned': 'women_owned'
+                }
+                
+                for db_field, api_field in boolean_fields.items():
+                    if db_field in column_names and api_field in award:
+                        award_data[db_field] = award[api_field] == 'Y'
                 
                 # Metadata fields
-                if 'data_source' in column_names:
-                    award_data['data_source'] = 'SBIR'
-                if 'grant_type' in column_names:
-                    award_data['grant_type'] = 'award'
-                if 'biotools_category' in column_names:
-                    award_data['biotools_category'] = 'biotools'
-                if 'relevance_score' in column_names:
-                    award_data['relevance_score'] = award.get('relevance_score', 0.0)
-                if 'updated_at' in column_names:
-                    award_data['updated_at'] = current_time
-                if 'last_scraped_at' in column_names:
-                    award_data['last_scraped_at'] = current_time
+                metadata_fields = {
+                    'data_source': 'SBIR',
+                    'grant_type': 'award',
+                    'biotools_category': 'biotools',
+                    'updated_at': current_time,
+                    'last_scraped_at': current_time
+                }
                 
-                # Build the SQL dynamically based on available columns
+                for field, value in metadata_fields.items():
+                    if field in column_names:
+                        award_data[field] = value
+                
+                # Build SQL dynamically
                 available_fields = {k: v for k, v in award_data.items() if k in column_names}
                 
                 if not available_fields:
@@ -789,18 +716,17 @@ class SBIRScraper:
         conn.commit()
         conn.close()
         
-        self.logger.info(f"💾 Saved {saved_count} awards to database")
+        self.logger.info(f"💾 Saved {saved_count} biotools awards to database")
         return saved_count
     
     def save_solicitations(self, solicitations: List[Dict]) -> int:
-        """Save solicitations to database with proper handling"""
+        """Save solicitations with enhanced biotools metadata"""
         if not solicitations:
             return 0
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Get the actual table structure
         cursor.execute("PRAGMA table_info(grants);")
         columns_info = cursor.fetchall()
         column_names = [col[1] for col in columns_info]
@@ -810,7 +736,6 @@ class SBIRScraper:
         
         for sol in solicitations:
             try:
-                # Create a mapping for solicitation data
                 sol_data = {}
                 
                 # Basic fields
@@ -829,41 +754,46 @@ class SBIRScraper:
                 
                 sol_data['description'] = topics_description[:1000] if topics_description else ''
                 
-                # SBIR-specific fields (only add if columns exist)
-                if 'branch' in column_names:
-                    sol_data['branch'] = sol.get('branch', '')
-                if 'phase' in column_names:
-                    sol_data['phase'] = sol.get('phase', '')
-                if 'program' in column_names:
-                    sol_data['program'] = sol.get('program', '')
-                if 'current_status' in column_names:
-                    sol_data['current_status'] = sol.get('current_status', '')
-                if 'open_date' in column_names:
-                    sol_data['open_date'] = sol.get('open_date', '')
-                if 'close_date' in column_names:
-                    sol_data['close_date'] = sol.get('close_date', '')
+                # Enhanced biotools fields
+                biotools_fields = [
+                    'biotools_relevance_score', 'biotools_validated', 'compound_keyword_matches',
+                    'biotools_tool_type', 'biotools_focus_area'
+                ]
+                
+                for field in biotools_fields:
+                    if field in column_names and field in sol:
+                        sol_data[field] = sol[field]
+                
+                # SBIR-specific fields
+                sbir_fields = {
+                    'branch': 'branch', 'phase': 'phase', 'program': 'program',
+                    'current_status': 'current_status', 'open_date': 'open_date',
+                    'close_date': 'close_date', 'solicitation_number': 'solicitation_number',
+                    'solicitation_year': 'solicitation_year'
+                }
+                
+                for db_field, api_field in sbir_fields.items():
+                    if db_field in column_names and api_field in sol:
+                        sol_data[db_field] = sol[api_field]
+                
+                # Special handling for solicitation topics
                 if 'solicitation_topics' in column_names:
                     sol_data['solicitation_topics'] = json.dumps(sol.get('solicitation_topics', []))
-                if 'solicitation_number' in column_names:
-                    sol_data['solicitation_number'] = sol.get('solicitation_number', '')
-                if 'solicitation_year' in column_names:
-                    sol_data['solicitation_year'] = sol.get('solicitation_year', None)
                 
                 # Metadata fields
-                if 'data_source' in column_names:
-                    sol_data['data_source'] = 'SBIR'
-                if 'grant_type' in column_names:
-                    sol_data['grant_type'] = 'solicitation'
-                if 'biotools_category' in column_names:
-                    sol_data['biotools_category'] = 'biotools'
-                if 'relevance_score' in column_names:
-                    sol_data['relevance_score'] = sol.get('relevance_score', 0.0)
-                if 'updated_at' in column_names:
-                    sol_data['updated_at'] = current_time
-                if 'last_scraped_at' in column_names:
-                    sol_data['last_scraped_at'] = current_time
+                metadata_fields = {
+                    'data_source': 'SBIR',
+                    'grant_type': 'solicitation',
+                    'biotools_category': 'biotools',
+                    'updated_at': current_time,
+                    'last_scraped_at': current_time
+                }
                 
-                # Build the SQL dynamically based on available columns
+                for field, value in metadata_fields.items():
+                    if field in column_names:
+                        sol_data[field] = value
+                
+                # Build SQL dynamically
                 available_fields = {k: v for k, v in sol_data.items() if k in column_names}
                 
                 if not available_fields:
@@ -887,18 +817,11 @@ class SBIRScraper:
         conn.commit()
         conn.close()
         
-        self.logger.info(f"💾 Saved {saved_count} solicitations to database")
+        self.logger.info(f"💾 Saved {saved_count} biotools solicitations to database")
         return saved_count
     
-    def save_companies(self, companies: List[Dict]) -> int:
-        """Save companies to database - placeholder for future enhancement"""
-        # For now, we'll focus on awards and solicitations
-        # Companies can be added later as a separate table
-        self.logger.info(f"Company data collection noted: {len(companies)} companies found")
-        return 0
-    
-    def get_database_stats(self) -> Dict[str, int]:
-        """Get current database statistics"""
+    def get_database_stats(self) -> Dict[str, Any]:
+        """Get enhanced database statistics with biotools metrics"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -908,14 +831,22 @@ class SBIRScraper:
         cursor.execute("SELECT COUNT(*) FROM grants")
         stats['total_grants'] = cursor.fetchone()[0]
         
-        # By data source
+        # Biotools-validated grants
         try:
-            cursor.execute("SELECT data_source, COUNT(*) FROM grants WHERE data_source IS NOT NULL GROUP BY data_source")
-            stats['by_source'] = cursor.fetchall()
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE biotools_validated = 1")
+            stats['biotools_validated'] = cursor.fetchone()[0]
         except sqlite3.OperationalError:
-            stats['by_source'] = []
+            stats['biotools_validated'] = 0
         
-        # By agency
+        # Average biotools relevance score
+        try:
+            cursor.execute("SELECT AVG(biotools_relevance_score) FROM grants WHERE biotools_relevance_score > 0")
+            avg_score = cursor.fetchone()[0]
+            stats['avg_biotools_score'] = round(avg_score, 2) if avg_score else 0.0
+        except sqlite3.OperationalError:
+            stats['avg_biotools_score'] = 0.0
+        
+        # By agency (biotools focus)
         cursor.execute("SELECT agency, COUNT(*) FROM grants GROUP BY agency ORDER BY COUNT(*) DESC")
         stats['by_agency'] = cursor.fetchall()
         
@@ -926,290 +857,348 @@ class SBIRScraper:
         except sqlite3.OperationalError:
             stats['by_type'] = []
         
-        # Recent data (last 30 days)
+        # Biotools tool types distribution
         try:
-            cursor.execute("SELECT COUNT(*) FROM grants WHERE last_scraped_at > date('now', '-30 days')")
-            stats['recent_updates'] = cursor.fetchone()[0]
+            cursor.execute("SELECT biotools_tool_type, COUNT(*) FROM grants WHERE biotools_tool_type IS NOT NULL AND biotools_tool_type != '' GROUP BY biotools_tool_type")
+            stats['by_tool_type'] = cursor.fetchall()
         except sqlite3.OperationalError:
-            stats['recent_updates'] = 0
+            stats['by_tool_type'] = []
         
-        # Biotools relevance
+        # Biotools focus areas distribution
         try:
-            cursor.execute("SELECT COUNT(*) FROM grants WHERE relevance_score > 0")
-            stats['biotools_relevant'] = cursor.fetchone()[0]
+            cursor.execute("SELECT biotools_focus_area, COUNT(*) FROM grants WHERE biotools_focus_area IS NOT NULL AND biotools_focus_area != '' GROUP BY biotools_focus_area")
+            stats['by_focus_area'] = cursor.fetchall()
         except sqlite3.OperationalError:
-            stats['biotools_relevant'] = 0
+            stats['by_focus_area'] = []
         
-        # Open solicitations
+        # Recent biotools updates
         try:
-            cursor.execute("SELECT COUNT(*) FROM grants WHERE grant_type = 'solicitation' AND current_status = 'open'")
-            stats['open_solicitations'] = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE last_scraped_at > date('now', '-30 days') AND biotools_validated = 1")
+            stats['recent_biotools_updates'] = cursor.fetchone()[0]
         except sqlite3.OperationalError:
-            stats['open_solicitations'] = 0
+            stats['recent_biotools_updates'] = 0
+        
+        # Compound keyword effectiveness
+        try:
+            cursor.execute("SELECT compound_keyword_matches, COUNT(*) FROM grants WHERE compound_keyword_matches IS NOT NULL AND compound_keyword_matches != '' GROUP BY compound_keyword_matches LIMIT 10")
+            stats['top_compound_keywords'] = cursor.fetchall()
+        except sqlite3.OperationalError:
+            stats['top_compound_keywords'] = []
         
         conn.close()
         return stats
     
-    def run_full_scraping(self, start_year: int = 2020) -> Dict[str, int]:
-        """Run complete SBIR/STTR data collection with enhanced solicitations handling"""
-        self.logger.info("🚀 Starting SBIR/STTR Comprehensive Data Collection")
+    def run_precision_biotools_scraping(self, start_year: int = 2022) -> Dict[str, int]:
+        """Run precision biotools data collection with compound keyword strategy"""
+        self.logger.info("🚀 Starting Precision BioTools Data Collection")
         self.logger.info("=" * 60)
         
         before_stats = self.get_database_stats()
-        self.logger.info(f"📊 Before: {before_stats['total_grants']} total grants")
+        self.logger.info(f"📊 Before: {before_stats['total_grants']} total grants, {before_stats.get('biotools_validated', 0)} biotools-validated")
         
         total_added = {
             'awards': 0,
             'solicitations': 0,
-            'companies': 0
+            'precision_score': 0.0
         }
         
-        # 1. Fetch Awards by Agency
+        # 1. Fetch Awards from Biotools-Relevant Agencies
         self.logger.info("\n" + "=" * 40)
-        self.logger.info("🏆 COLLECTING AWARD DATA")
+        self.logger.info("🏆 COLLECTING PRECISION BIOTOOLS AWARDS")
         
-        # Key agencies for biotools funding
-        agencies = ['HHS', 'NSF', 'DOD', 'DOE', 'NASA', 'EPA', 'USDA']
+        biotools_agencies = ['HHS', 'NIH', 'NSF', 'DOE', 'CDC', 'DARPA']
         
-        for agency in agencies:
-            try:
-                awards = self.fetch_awards_by_agency(agency, start_year)
-                saved = self.save_awards(awards)
-                total_added['awards'] += saved
-                
-                # Longer delay between agencies to be more respectful
-                time.sleep(5)
-                
-            except Exception as e:
-                self.logger.error(f"Failed to process {agency} awards: {e}")
+        for agency in biotools_agencies:
+            if agency in self.biotools_agencies:
+                try:
+                    self.logger.info(f"Processing {agency} with biotools programs: {self.biotools_agencies[agency]['programs']}")
+                    awards = self.fetch_biotools_awards_by_agency(agency, start_year)
+                    saved = self.save_awards(awards)
+                    total_added['awards'] += saved
+                    
+                    # Calculate precision score for this agency
+                    if awards:
+                        avg_relevance = sum(award.get('biotools_relevance_score', 0) for award in awards) / len(awards)
+                        total_added['precision_score'] += avg_relevance
+                        self.logger.info(f"  {agency} precision score: {avg_relevance:.2f}")
+                    
+                    time.sleep(5)  # Respectful delay between agencies
+                    
+                except Exception as e:
+                    self.logger.error(f"Failed to process {agency} awards: {e}")
         
-        # 2. Fetch Open Solicitations (with longer delay after awards)
+        # 2. Fetch Biotools Solicitations
         self.logger.info("\n" + "=" * 40)
-        self.logger.info("📋 COLLECTING SOLICITATION DATA")
-        self.logger.info("⏳ Waiting 10 seconds after awards collection for API recovery...")
-        time.sleep(10)  # Give API time to recover after heavy awards collection
+        self.logger.info("📋 COLLECTING PRECISION BIOTOOLS SOLICITATIONS")
+        self.logger.info("⏳ Waiting 10 seconds for API recovery...")
+        time.sleep(10)
         
         try:
-            solicitations = self.fetch_open_solicitations()
+            solicitations = self.fetch_biotools_solicitations()
             saved = self.save_solicitations(solicitations)
             total_added['solicitations'] += saved
+            
+            # Calculate solicitation precision score
+            if solicitations:
+                avg_relevance = sum(sol.get('biotools_relevance_score', 0) for sol in solicitations) / len(solicitations)
+                total_added['precision_score'] += avg_relevance
+                self.logger.info(f"  Solicitations precision score: {avg_relevance:.2f}")
             
         except Exception as e:
             self.logger.error(f"Failed to process solicitations: {e}")
             self.logger.warning("💡 Try running 'python app/scraper.py solicitations' separately later")
         
-        # 3. Fetch Companies (basic collection)
+        # 3. Calculate Overall Precision Metrics
         self.logger.info("\n" + "=" * 40)
-        self.logger.info("🏢 COLLECTING COMPANY DATA")
+        self.logger.info("📊 PRECISION ANALYSIS")
         
-        try:
-            companies = self.fetch_biotools_companies()
-            saved = self.save_companies(companies)
-            total_added['companies'] += saved
-            
-        except Exception as e:
-            self.logger.error(f"Failed to process companies: {e}")
-        
-        # Final Statistics
-        self.logger.info("\n" + "=" * 60)
         after_stats = self.get_database_stats()
         
-        self.logger.info("📈 SCRAPING RESULTS:")
-        self.logger.info(f"  Total grants: {before_stats['total_grants']} → {after_stats['total_grants']} (+{after_stats['total_grants'] - before_stats['total_grants']})")
-        self.logger.info(f"  Awards added: {total_added['awards']}")
-        self.logger.info(f"  Solicitations added: {total_added['solicitations']}")
-        self.logger.info(f"  Companies processed: {total_added['companies']}")
+        precision_metrics = {
+            'total_collected': total_added['awards'] + total_added['solicitations'],
+            'biotools_validated_rate': 0.0,
+            'avg_relevance_score': after_stats.get('avg_biotools_score', 0.0),
+            'compound_keyword_effectiveness': len(after_stats.get('top_compound_keywords', [])),
+            'domain_coverage': len(after_stats.get('by_focus_area', []))
+        }
         
-        self.logger.info("\n📊 BREAKDOWN BY AGENCY:")
-        for agency, count in after_stats['by_agency'][:10]:  # Top 10
-            if agency:  # Skip null agencies
+        if precision_metrics['total_collected'] > 0:
+            precision_metrics['biotools_validated_rate'] = (
+                after_stats.get('biotools_validated', 0) / after_stats['total_grants'] * 100
+            )
+        
+        # Final Results
+        self.logger.info("\n" + "=" * 60)
+        self.logger.info("📈 PRECISION BIOTOOLS SCRAPING RESULTS:")
+        self.logger.info(f"  Total grants: {before_stats['total_grants']} → {after_stats['total_grants']} (+{after_stats['total_grants'] - before_stats['total_grants']})")
+        self.logger.info(f"  Biotools awards added: {total_added['awards']}")
+        self.logger.info(f"  Biotools solicitations added: {total_added['solicitations']}")
+        self.logger.info(f"  Biotools validation rate: {precision_metrics['biotools_validated_rate']:.1f}%")
+        self.logger.info(f"  Average relevance score: {precision_metrics['avg_relevance_score']:.2f}")
+        
+        self.logger.info("\n📊 BIOTOOLS TAXONOMY COVERAGE:")
+        if after_stats.get('by_tool_type'):
+            self.logger.info("  Tool Types:")
+            for tool_type, count in after_stats['by_tool_type'][:5]:
+                if tool_type:
+                    self.logger.info(f"    {tool_type}: {count}")
+        
+        if after_stats.get('by_focus_area'):
+            self.logger.info("  Focus Areas:")
+            for focus_area, count in after_stats['by_focus_area'][:5]:
+                if focus_area:
+                    self.logger.info(f"    {focus_area}: {count}")
+        
+        self.logger.info("\n📊 AGENCY BREAKDOWN:")
+        for agency, count in after_stats['by_agency'][:8]:
+            if agency and agency in self.biotools_agencies:
+                self.logger.info(f"   {agency}: {count} grants ✅ biotools-focused")
+            elif agency:
                 self.logger.info(f"   {agency}: {count} grants")
         
-        if after_stats.get('by_type'):
-            self.logger.info("\n📊 BREAKDOWN BY TYPE:")
-            for grant_type, count in after_stats['by_type']:
-                self.logger.info(f"   {grant_type}: {count}")
-        
-        # Special handling for solicitations
-        if total_added['solicitations'] == 0:
-            self.logger.warning("\n⚠️  NO SOLICITATIONS COLLECTED")
-            self.logger.warning("This is often due to API rate limiting after awards collection.")
-            self.logger.warning("RECOMMENDED ACTIONS:")
-            self.logger.warning("  1. Wait 30 minutes, then run: python app/scraper.py solicitations")
-            self.logger.warning("  2. Check logs for specific errors")
-            self.logger.warning("  3. Try manual API test: curl with proper headers")
-        else:
-            self.logger.info(f"\n🎉 Successfully collected {total_added['solicitations']} open solicitations!")
-        
-        total_new = sum(total_added.values())
-        self.logger.info(f"\n✅ Total new records added: {total_new}")
+        # Success Assessment
+        total_new = total_added['awards'] + total_added['solicitations']
         
         if total_new > 0:
-            self.logger.info("🎉 SBIR/STTR database successfully expanded!")
-            self.logger.info("📈 Your biotools grant matching system now includes:")
-            self.logger.info("   • Historical award data for business development")
-            if total_added['solicitations'] > 0:
-                self.logger.info("   • Active solicitations for funding opportunities")
-            self.logger.info("   • Enhanced search and matching capabilities")
+            self.logger.info(f"\n🎉 SUCCESS: Precision biotools scraping completed!")
+            self.logger.info("📈 Enhanced biotools grant matching system includes:")
+            self.logger.info("   • Compound keyword validated awards and solicitations")
+            self.logger.info("   • Domain contamination filtering (excluded astronomy, geology, etc.)")
+            self.logger.info("   • Biotools taxonomy classification (tool types & focus areas)")
+            self.logger.info("   • Agency program pre-filtering for biotools relevance")
+            
+            if precision_metrics['biotools_validated_rate'] > 80:
+                self.logger.info(f"   • HIGH PRECISION: {precision_metrics['biotools_validated_rate']:.1f}% biotools validation rate")
+            elif precision_metrics['biotools_validated_rate'] > 60:
+                self.logger.info(f"   • GOOD PRECISION: {precision_metrics['biotools_validated_rate']:.1f}% biotools validation rate")
+            else:
+                self.logger.warning(f"   • REVIEW NEEDED: {precision_metrics['biotools_validated_rate']:.1f}% biotools validation rate")
+        else:
+            self.logger.warning("⚠️  No new biotools data collected - check API connectivity and keyword effectiveness")
         
+        total_added['precision_metrics'] = precision_metrics
         return total_added
     
     def run_solicitations_only(self) -> int:
-        """Quick update of just open solicitations (for frequent updates)"""
-        self.logger.info("🔄 Quick Update: Fetching Open Solicitations Only")
+        """Quick update of biotools solicitations only"""
+        self.logger.info("🔄 Quick Update: Biotools Solicitations Only")
         
         try:
-            solicitations = self.fetch_open_solicitations()
+            solicitations = self.fetch_biotools_solicitations()
             saved = self.save_solicitations(solicitations)
             
-            self.logger.info(f"✅ Updated {saved} solicitations")
+            self.logger.info(f"✅ Updated {saved} biotools solicitations")
             
             if saved == 0:
-                self.logger.warning("⚠️  No solicitations found. This could be due to:")
-                self.logger.warning("  • No biotools solicitations currently open")
+                self.logger.warning("⚠️  No biotools solicitations found. This could be due to:")
+                self.logger.warning("  • No relevant biotools solicitations currently open")
                 self.logger.warning("  • API rate limiting or temporary issues")
-                self.logger.warning("  • Try again in 30 minutes")
+                self.logger.warning("  • Compound keyword strategy too restrictive")
+                self.logger.warning("  • Try again in 30 minutes or adjust keywords")
             
             return saved
             
         except Exception as e:
-            self.logger.error(f"Failed to update solicitations: {e}")
+            self.logger.error(f"Failed to update biotools solicitations: {e}")
             return 0
     
-    def run_recent_awards_only(self, months_back: int = 6) -> int:
-        """Update only recent awards (for incremental updates)"""
-        self.logger.info(f"🔄 Quick Update: Fetching Awards from Last {months_back} Months")
+    def test_biotools_api_connectivity(self) -> Dict[str, Any]:
+        """Test API connectivity with biotools-specific validation"""
+        self.logger.info("🔍 Testing SBIR API Connectivity with Biotools Focus...")
         
-        # Calculate start year for recent data
-        cutoff_date = datetime.now() - timedelta(days=months_back * 30)
-        start_year = cutoff_date.year
+        test_results = {
+            'connectivity': {},
+            'biotools_validation': {},
+            'compound_keyword_test': {}
+        }
         
-        total_awards = 0
-        agencies = ['HHS', 'NSF', 'DOD']  # Focus on key agencies for quick updates
-        
-        for agency in agencies:
-            try:
-                awards = self.fetch_awards_by_agency(agency, start_year)
-                saved = self.save_awards(awards)
-                total_awards += saved
-                
-            except Exception as e:
-                self.logger.error(f"Failed to update {agency} awards: {e}")
-        
-        self.logger.info(f"✅ Updated {total_awards} recent awards")
-        return total_awards
-    
-    def test_api_connectivity(self) -> Dict[str, bool]:
-        """Test all API endpoints to verify connectivity"""
-        self.logger.info("🔍 Testing SBIR API Connectivity...")
-        
-        test_results = {}
-        
-        # Test awards API
+        # Test basic connectivity
         try:
             data = self.make_api_request('awards', {'rows': 1})
-            test_results['awards'] = data is not None and len(data) > 0
-            self.logger.info(f"  Awards API: {'✅ Working' if test_results['awards'] else '❌ Failed'}")
+            test_results['connectivity']['awards'] = data is not None and len(data) > 0
+            self.logger.info(f"  Awards API: {'✅ Working' if test_results['connectivity']['awards'] else '❌ Failed'}")
         except Exception as e:
-            test_results['awards'] = False
+            test_results['connectivity']['awards'] = False
             self.logger.error(f"  Awards API: ❌ Failed - {e}")
         
-        # Test solicitations API with API-compliant parameters
         try:
-            data = self.make_api_request('solicitations', {'rows': 25})  # API compliant
-            test_results['solicitations'] = data is not None and len(data) >= 0
-            self.logger.info(f"  Solicitations API: {'✅ Working' if test_results['solicitations'] else '❌ Failed'}")
+            data = self.make_api_request('solicitations', {'rows': 25})
+            test_results['connectivity']['solicitations'] = data is not None and len(data) >= 0
+            self.logger.info(f"  Solicitations API: {'✅ Working' if test_results['connectivity']['solicitations'] else '❌ Failed'}")
         except Exception as e:
-            test_results['solicitations'] = False
+            test_results['connectivity']['solicitations'] = False
             self.logger.error(f"  Solicitations API: ❌ Failed - {e}")
         
-        # Test companies API
-        try:
-            data = self.make_api_request('firm', {'rows': 1})
-            test_results['companies'] = data is not None and len(data) > 0
-            self.logger.info(f"  Companies API: {'✅ Working' if test_results['companies'] else '❌ Failed'}")
-        except Exception as e:
-            test_results['companies'] = False
-            self.logger.error(f"  Companies API: ❌ Failed - {e}")
+        # Test biotools compound keyword effectiveness
+        if test_results['connectivity']['awards']:
+            self.logger.info("🧪 Testing biotools compound keyword strategy...")
+            
+            try:
+                # Test with a compound biotools keyword
+                test_data = self.make_api_request('awards', {
+                    'agency': 'HHS',
+                    'year': 2024,
+                    'rows': 20
+                })
+                
+                if test_data:
+                    biotools_count = 0
+                    total_count = len(test_data)
+                    
+                    for award in test_data:
+                        title = award.get('award_title', '')
+                        abstract = award.get('abstract', '')
+                        relevance_data = self.is_biotools_relevant(title, abstract)
+                        
+                        if relevance_data['is_relevant']:
+                            biotools_count += 1
+                    
+                    effectiveness_rate = (biotools_count / total_count * 100) if total_count > 0 else 0
+                    test_results['compound_keyword_test']['effectiveness_rate'] = effectiveness_rate
+                    test_results['compound_keyword_test']['sample_size'] = total_count
+                    test_results['compound_keyword_test']['biotools_matches'] = biotools_count
+                    
+                    self.logger.info(f"  Compound keyword effectiveness: {effectiveness_rate:.1f}% ({biotools_count}/{total_count})")
+                    
+                    if effectiveness_rate > 50:
+                        self.logger.info("  ✅ HIGH effectiveness - compound keywords working well")
+                    elif effectiveness_rate > 25:
+                        self.logger.info("  ⚠️  MODERATE effectiveness - consider keyword refinement")
+                    else:
+                        self.logger.warning("  ❌ LOW effectiveness - compound keywords need revision")
+                
+            except Exception as e:
+                self.logger.error(f"  Compound keyword test failed: {e}")
         
-        working_count = sum(test_results.values())
-        self.logger.info(f"\n📊 API Status: {working_count}/3 endpoints working")
+        # Overall assessment
+        working_apis = sum(test_results['connectivity'].values())
+        self.logger.info(f"\n📊 API Status: {working_apis}/2 endpoints working")
         
-        if working_count == 3:
-            self.logger.info("🎉 All APIs are working! Ready for full scraping.")
-        elif working_count >= 2:
-            self.logger.info("✅ Most APIs working. Proceed with caution.")
+        if working_apis == 2:
+            self.logger.info("🎉 All APIs working! Ready for precision biotools scraping.")
+        elif working_apis >= 1:
+            self.logger.info("✅ Partial API access. Can proceed with available endpoints.")
         else:
-            self.logger.warning("⚠️  Multiple API issues detected. Check logs.")
+            self.logger.warning("⚠️  API connectivity issues detected. Check network and API status.")
         
         return test_results
 
 
 def main():
-    """Main execution function"""
-    scraper = SBIRScraper()
+    """Main execution function with enhanced biotools options"""
+    scraper = EnhancedBiotoolsScraper()
     
     import sys
     
     if len(sys.argv) > 1:
         command = sys.argv[1].lower()
         
-        if command == 'full':
-            # Full scraping (use for initial setup)
-            start_year = int(sys.argv[2]) if len(sys.argv) > 2 else 2020
-            scraper.run_full_scraping(start_year)
+        if command == 'precision' or command == 'full':
+            # Precision biotools scraping
+            start_year = int(sys.argv[2]) if len(sys.argv) > 2 else 2022
+            results = scraper.run_precision_biotools_scraping(start_year)
+            
+            print(f"\n🎯 PRECISION SUMMARY:")
+            print(f"  Awards: {results['awards']}")
+            print(f"  Solicitations: {results['solicitations']}")
+            if 'precision_metrics' in results:
+                metrics = results['precision_metrics']
+                print(f"  Validation Rate: {metrics['biotools_validated_rate']:.1f}%")
+                print(f"  Avg Relevance: {metrics['avg_relevance_score']:.2f}")
             
         elif command == 'solicitations':
-            # Update only solicitations (daily)
+            # Update biotools solicitations only
             scraper.run_solicitations_only()
             
-        elif command == 'recent':
-            # Update only recent awards (weekly)
-            months = int(sys.argv[2]) if len(sys.argv) > 2 else 6
-            scraper.run_recent_awards_only(months)
+        elif command == 'test':
+            # Test API connectivity and biotools validation
+            results = scraper.test_biotools_api_connectivity()
             
+            if all(results['connectivity'].values()):
+                print("\n🎉 Ready for precision biotools scraping!")
+            elif sum(results['connectivity'].values()) >= 1:
+                print("\n✅ Partial API access available.")
+            else:
+                print("\n⚠️ API connectivity issues detected.")
+                
         elif command == 'stats':
-            # Show database statistics
+            # Show enhanced biotools statistics
             stats = scraper.get_database_stats()
-            print("\n📊 SBIR Database Statistics:")
+            print("\n📊 Enhanced BioTools Database Statistics:")
             print(f"  Total Grants: {stats['total_grants']}")
-            print(f"  Biotools Relevant: {stats['biotools_relevant']}")
-            print(f"  Recent Updates: {stats['recent_updates']}")
-            print(f"  Open Solicitations: {stats['open_solicitations']}")
+            print(f"  BioTools Validated: {stats['biotools_validated']}")
+            print(f"  Average BioTools Score: {stats['avg_biotools_score']}")
+            print(f"  Recent BioTools Updates: {stats['recent_biotools_updates']}")
             
             if stats['by_agency']:
                 print(f"\n📊 Grants by Agency:")
-                for agency, count in stats['by_agency'][:10]:  # Top 10
-                    if agency:
-                        print(f"   {agency}: {count}")
+                for agency, count in stats['by_agency'][:8]:
+                    biotools_indicator = "🧬" if agency in scraper.biotools_agencies else ""
+                    print(f"   {agency}: {count} {biotools_indicator}")
             
-            if stats['by_type']:
-                print(f"\n📊 Grants by Type:")
-                for grant_type, count in stats['by_type']:
-                    print(f"   {grant_type}: {count}")
-                    
-        elif command == 'test':
-            # Test API connectivity
-            results = scraper.test_api_connectivity()
-            if all(results.values()):
-                print("\n🎉 All APIs are working! Ready to scrape.")
-            elif sum(results.values()) >= 2:
-                print("\n✅ Most APIs working. You can proceed.")
-            else:
-                print("\n⚠️ Multiple API issues detected. Check logs for details.")
+            if stats['by_tool_type']:
+                print(f"\n🛠️ BioTools Tool Types:")
+                for tool_type, count in stats['by_tool_type'][:5]:
+                    if tool_type:
+                        print(f"   {tool_type}: {count}")
             
+            if stats['by_focus_area']:
+                print(f"\n🎯 BioTools Focus Areas:")
+                for focus_area, count in stats['by_focus_area'][:5]:
+                    if focus_area:
+                        print(f"   {focus_area}: {count}")
+                        
         else:
-            print("Usage:")
-            print("  python app/scraper.py full [start_year]    # Full data collection")
-            print("  python app/scraper.py solicitations       # Update solicitations only")
-            print("  python app/scraper.py recent [months]     # Update recent awards")
-            print("  python app/scraper.py stats               # Show database stats")
-            print("  python app/scraper.py test                # Test API connectivity")
+            print("Enhanced BioTools Scraper Usage:")
+            print("  python app/scraper.py precision [start_year]  # Precision biotools collection")
+            print("  python app/scraper.py solicitations          # Update biotools solicitations")
+            print("  python app/scraper.py test                   # Test APIs and compound keywords")
+            print("  python app/scraper.py stats                  # Show biotools statistics")
     else:
-        # Default: run full scraping from 2020
-        print("🚀 Starting default full scraping from 2020...")
-        print("💡 Use 'python app/scraper.py test' to test APIs first")
-        scraper.run_full_scraping(2020)
+        # Default: run precision biotools scraping from 2022
+        print("🚀 Starting default precision biotools scraping from 2022...")
+        print("💡 Use 'python app/scraper.py test' to validate compound keywords first")
+        scraper.run_precision_biotools_scraping(2022)
 
 
 if __name__ == "__main__":

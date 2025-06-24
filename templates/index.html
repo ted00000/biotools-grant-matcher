@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BioTools Grant Matcher Pro</title>
+    <title>BioTools Grant Matcher Pro - Enhanced</title>
     <style>
         * {
             margin: 0;
@@ -42,27 +42,6 @@
             opacity: 0.9;
         }
 
-        .stats-section {
-            background: rgba(255,255,255,0.1);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 30px;
-            color: white;
-            text-align: center;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-top: 15px;
-        }
-
-        .stat-item h3 {
-            font-size: 2rem;
-            margin-bottom: 5px;
-        }
-
         .search-section {
             background: white;
             border-radius: 12px;
@@ -71,7 +50,7 @@
             margin-bottom: 30px;
         }
 
-        /* Data Type Selector */
+        /* Enhanced Data Type Selector */
         .data-type-selector {
             display: flex;
             gap: 15px;
@@ -123,44 +102,209 @@
             transform: scale(1.2);
         }
 
-        .data-type-option .option-icon {
-            font-size: 1.2rem;
-            margin-right: 8px;
-        }
-
-        .data-type-option .option-details {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .data-type-option .option-title {
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        .data-type-option .option-subtitle {
-            font-size: 0.75rem;
-            opacity: 0.8;
-        }
-
-        .search-form {
-            display: flex;
-            gap: 15px;
+        /* Biotools Taxonomy Selectors */
+        .biotools-taxonomy {
+            background: #e8f4fd;
+            border-radius: 8px;
+            padding: 20px;
             margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .taxonomy-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .taxonomy-header h3 {
+            color: #495057;
+            font-size: 1.1rem;
+            margin-left: 10px;
+        }
+
+        .taxonomy-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .taxonomy-section {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+
+        .taxonomy-section h4 {
+            color: #343a40;
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .taxonomy-section .section-icon {
+            margin-right: 8px;
+            font-size: 1.1rem;
+        }
+
+        .taxonomy-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .taxonomy-tag {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            color: #495057;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .taxonomy-tag:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .taxonomy-tag.selected {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .taxonomy-tag.required {
+            border: 2px solid #dc3545;
+            font-weight: 500;
+        }
+
+        .required-indicator {
+            color: #dc3545;
+            font-size: 0.7rem;
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: white;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Smart Search Input */
+        .smart-search-container {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .search-input-container {
+            position: relative;
         }
 
         .search-input {
-            flex: 1;
-            padding: 15px 20px;
+            width: 100%;
+            padding: 15px 20px 15px 50px;
             border: 2px solid #e1e5e9;
             border-radius: 8px;
             font-size: 1rem;
-            transition: border-color 0.3s ease;
+            transition: all 0.3s ease;
         }
 
         .search-input:focus {
             outline: none;
             border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+            font-size: 1.2rem;
+        }
+
+        .search-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #f8f9fa;
+            display: flex;
+            align-items: center;
+        }
+
+        .suggestion-item:hover {
+            background: #f8f9fa;
+        }
+
+        .suggestion-item .suggestion-type {
+            background: #667eea;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            margin-right: 10px;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        /* Context Validation */
+        .context-validation {
+            margin-top: 10px;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .context-validation.valid {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .context-validation.invalid {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .context-validation.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            display: block;
+        }
+
+        /* Search Button Enhanced */
+        .search-form {
+            display: flex;
+            gap: 15px;
+            align-items: end;
         }
 
         .search-btn {
@@ -172,11 +316,13 @@
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s ease;
+            transition: all 0.2s ease;
+            min-width: 150px;
         }
 
-        .search-btn:hover {
+        .search-btn:hover:not(:disabled) {
             transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
         }
 
         .search-btn:disabled {
@@ -185,22 +331,68 @@
             transform: none;
         }
 
-        .toggle-filters {
-            background: none;
-            border: none;
-            color: #667eea;
-            cursor: pointer;
+        /* Validation Messages */
+        .validation-messages {
+            margin-top: 15px;
+            padding: 15px;
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .validation-messages.show {
+            display: block;
+        }
+
+        .validation-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
             font-size: 0.9rem;
-            margin-top: 10px;
-            padding: 8px 12px;
-            border-radius: 4px;
-            transition: background-color 0.2s ease;
         }
 
-        .toggle-filters:hover {
-            background-color: #f0f0f0;
+        .validation-item:last-child {
+            margin-bottom: 0;
         }
 
+        .validation-icon {
+            margin-right: 8px;
+            font-size: 1rem;
+        }
+
+        /* Example Searches */
+        .example-searches {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .example-searches h4 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .example-item {
+            display: inline-block;
+            background: white;
+            padding: 6px 12px;
+            margin: 3px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border: 1px solid #dee2e6;
+            transition: all 0.2s ease;
+        }
+
+        .example-item:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+
+        /* Advanced Filters Enhanced */
         .advanced-filters {
             margin-top: 20px;
             padding: 20px;
@@ -225,6 +417,7 @@
             font-size: 0.9rem;
             color: #666;
             margin-bottom: 5px;
+            font-weight: 500;
         }
 
         .filter-group select,
@@ -233,337 +426,31 @@
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 0.9rem;
+            transition: border-color 0.2s ease;
         }
 
-        .context-help {
-            margin-top: 15px;
-            padding: 15px;
-            background: #e8f4fd;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
+        .filter-group select:focus,
+        .filter-group input:focus {
+            outline: none;
+            border-color: #667eea;
         }
 
-        .context-help h4 {
-            color: #495057;
-            margin-bottom: 8px;
-            font-size: 0.9rem;
-        }
-
-        .context-help p {
-            color: #6c757d;
-            font-size: 0.85rem;
-            line-height: 1.4;
-        }
-
-        .saved-searches {
-            margin-top: 15px;
-            padding: 15px;
-            background: #e8f4fd;
-            border-radius: 8px;
-        }
-
-        .saved-search-item {
-            display: inline-block;
-            background: white;
-            padding: 5px 12px;
-            margin: 3px;
-            border-radius: 15px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            border: 1px solid #ddd;
-        }
-
-        .saved-search-item:hover {
-            background: #f0f0f0;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 10px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .results-section {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            padding: 30px;
-        }
-
-        .results-toolbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #f8f9fa;
-        }
-
-        .results-type-indicator {
-            display: inline-flex;
-            align-items: center;
-            background: #667eea;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 500;
-        }
-
-        .results-type-indicator .type-icon {
-            margin-right: 6px;
-        }
-
-        .grant-card {
-            border: 1px solid #e1e5e9;
-            border-radius: 8px;
-            padding: 25px;
-            margin-bottom: 20px;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-
-        .grant-card:hover {
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            transform: translateY(-2px);
-        }
-
-        .grant-card.award-card {
-            border-left: 4px solid #28a745;
-        }
-
-        .grant-card.solicitation-card {
-            border-left: 4px solid #ffc107;
-        }
-
-        .grant-card.company-card {
-            border-left: 4px solid #6f42c1;
-        }
-
-        .grant-title {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 10px;
-            line-height: 1.3;
-        }
-
-        .grant-meta {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 15px;
-            font-size: 0.9rem;
-            color: #666;
-            flex-wrap: wrap;
-        }
-
-        .grant-type-badge {
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        .badge-award {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .badge-solicitation {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .badge-company {
-            background: #e2e3f5;
-            color: #383d41;
-        }
-
-        .grant-agency {
-            background: #667eea;
-            color: white;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        .grant-amount {
-            color: #28a745;
-            font-weight: 600;
-        }
-
-        .grant-deadline {
-            color: #dc3545;
-            font-weight: 600;
-        }
-
-        .grant-deadline.upcoming {
-            color: #ffc107;
-        }
-
-        .grant-deadline.far {
-            color: #6c757d;
-        }
-
-        .grant-description {
-            color: #555;
-            line-height: 1.6;
-            margin-bottom: 15px;
-        }
-
-        .grant-keywords {
-            margin-bottom: 15px;
-        }
-
-        .keyword-tag {
-            background: #f8f9fa;
-            color: #495057;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            margin-right: 6px;
-            margin-bottom: 4px;
-            display: inline-block;
-        }
-
-        .grant-actions {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .action-btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .btn-primary {
-            background: #28a745;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #218838;
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-
-        .btn-apply {
-            background: #ffc107;
-            color: #212529;
-        }
-
-        .btn-apply:hover {
-            background: #e0a800;
-        }
-
-        .relevance-score {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            z-index: 1000;
-            opacity: 0;
-            transform: translateX(100%);
-            transition: all 0.3s ease;
-        }
-
-        .notification.show {
-            opacity: 1;
-            transform: translateX(0);
-        }
-
-        .notification.success {
-            background: #28a745;
-        }
-
-        .notification.error {
-            background: #dc3545;
-        }
-
+        /* Responsive Design */
         @media (max-width: 768px) {
-            .data-type-options {
-                justify-content: center;
-            }
-            
-            .data-type-option {
-                min-width: 100px;
-                font-size: 0.85rem;
-            }
-            
-            .search-form {
-                flex-direction: column;
+            .taxonomy-grid {
+                grid-template-columns: 1fr;
             }
             
             .filter-row {
                 grid-template-columns: 1fr;
             }
             
-            .results-toolbar {
+            .search-form {
                 flex-direction: column;
-                gap: 15px;
             }
             
-            .grant-meta {
-                flex-direction: column;
-                gap: 10px;
-            }
-            
-            .header h1 {
-                font-size: 2rem;
-            }
-
-            .grant-actions {
-                flex-direction: column;
-                align-items: stretch;
+            .data-type-options {
+                justify-content: center;
             }
         }
     </style>
@@ -572,29 +459,7 @@
     <div class="container">
         <div class="header">
             <h1>🧬 BioTools Grant Matcher Pro</h1>
-            <p>AI-powered funding discovery for biomedical research tools</p>
-        </div>
-
-        <div class="stats-section" id="stats-section">
-            <h3>Database Status</h3>
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <h3 id="total-awards">-</h3>
-                    <p>Awards</p>
-                </div>
-                <div class="stat-item">
-                    <h3 id="total-solicitations">-</h3>
-                    <p>Open Solicitations</p>
-                </div>
-                <div class="stat-item">
-                    <h3 id="total-companies">-</h3>
-                    <p>Companies</p>
-                </div>
-                <div class="stat-item">
-                    <h3 id="success-rate">78%</h3>
-                    <p>User Success Rate</p>
-                </div>
-            </div>
+            <p>Precision funding discovery for life science research tools</p>
         </div>
 
         <div class="search-section">
@@ -606,83 +471,133 @@
                         <input type="radio" name="data-type" value="all" id="type-all" checked>
                         <div class="option-details">
                             <div class="option-title">🔍 All Data</div>
-                            <div class="option-subtitle">Comprehensive search</div>
                         </div>
                     </label>
                     <label class="data-type-option" for="type-awards">
                         <input type="radio" name="data-type" value="awards" id="type-awards">
                         <div class="option-details">
                             <div class="option-title">🏆 Awards</div>
-                            <div class="option-subtitle">Historical funding</div>
                         </div>
                     </label>
                     <label class="data-type-option" for="type-solicitations">
                         <input type="radio" name="data-type" value="solicitations" id="type-solicitations">
                         <div class="option-details">
-                            <div class="option-title">📋 Solicitations</div>
-                            <div class="option-subtitle">Open opportunities</div>
+                            <div class="option-title">📋 Opportunities</div>
                         </div>
                     </label>
                     <label class="data-type-option" for="type-companies">
                         <input type="radio" name="data-type" value="companies" id="type-companies">
                         <div class="option-details">
                             <div class="option-title">🏢 Companies</div>
-                            <div class="option-subtitle">Funded organizations</div>
                         </div>
                     </label>
                 </div>
             </div>
 
-            <!-- Context Help -->
-            <div class="context-help" id="context-help">
-                <h4>💡 Searching All Data</h4>
-                <p>Find awards, solicitations, and companies across the entire biotools funding ecosystem. Use specific terms like "diagnostic biosensor" or "microfluidics platform" for best results.</p>
+            <!-- Biotools Taxonomy Selector -->
+            <div class="biotools-taxonomy">
+                <div class="taxonomy-header">
+                    <span style="font-size: 1.3rem;">🧬</span>
+                    <h3>BioTools Taxonomy (Select at least one from each category)</h3>
+                </div>
+                
+                <div class="taxonomy-grid">
+                    <!-- Tool Types -->
+                    <div class="taxonomy-section">
+                        <h4><span class="section-icon">🛠️</span>Tool Types</h4>
+                        <div class="taxonomy-tags" id="tool-types">
+                            <span class="taxonomy-tag" data-value="instrument">Instrument</span>
+                            <span class="taxonomy-tag" data-value="assay">Assay</span>
+                            <span class="taxonomy-tag" data-value="software">Software</span>
+                            <span class="taxonomy-tag" data-value="database_platform">Database/Platform</span>
+                            <span class="taxonomy-tag" data-value="integrated_system">Integrated System</span>
+                            <span class="taxonomy-tag" data-value="service">Service</span>
+                            <span class="taxonomy-tag" data-value="consumable">Consumable</span>
+                        </div>
+                    </div>
+
+                    <!-- Focus Areas -->
+                    <div class="taxonomy-section">
+                        <h4><span class="section-icon">🎯</span>Focus Areas</h4>
+                        <div class="taxonomy-tags" id="focus-areas">
+                            <span class="taxonomy-tag" data-value="genomics">Genomics</span>
+                            <span class="taxonomy-tag" data-value="cell_biology">Cell Biology</span>
+                            <span class="taxonomy-tag" data-value="proteomics">Proteomics</span>
+                            <span class="taxonomy-tag" data-value="metabolomics">Metabolomics</span>
+                            <span class="taxonomy-tag" data-value="bioinformatics">Bioinformatics</span>
+                            <span class="taxonomy-tag" data-value="single_cell">Single Cell</span>
+                            <span class="taxonomy-tag" data-value="spatial_biology">Spatial Biology</span>
+                            <span class="taxonomy-tag" data-value="immunology">Immunology</span>
+                            <span class="taxonomy-tag" data-value="synthetic_biology">Synthetic Biology</span>
+                            <span class="taxonomy-tag" data-value="multi_omics">Multi-Omics</span>
+                            <span class="taxonomy-tag" data-value="microbiome">Microbiome</span>
+                            <span class="taxonomy-tag" data-value="high_throughput_screening">High-Throughput Screening</span>
+                            <span class="taxonomy-tag" data-value="diagnostics">Diagnostics</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
+            <!-- Smart Search Input -->
+            <div class="smart-search-container">
+                <div class="search-input-container">
+                    <span class="search-icon">🔍</span>
+                    <input 
+                        type="text" 
+                        class="search-input" 
+                        id="search-input"
+                        placeholder="Describe your specific biotools need (e.g., 'CRISPR screening platform', 'single cell RNA sequencing')..."
+                    >
+                    <div class="search-suggestions" id="search-suggestions"></div>
+                </div>
+                
+                <div class="context-validation" id="context-validation">
+                    <span class="validation-icon">✓</span>
+                    <span class="validation-text">Search includes biotools context</span>
+                </div>
+            </div>
+
+            <!-- Search Form -->
             <form class="search-form" id="search-form">
-                <input 
-                    type="text" 
-                    class="search-input" 
-                    id="search-input"
-                    placeholder="Describe your biotools project or research area..."
-                    required
-                >
-                <button type="submit" class="search-btn" id="search-btn">
-                    🔍 Find Grants
-                </button>
+                <div style="flex: 1;">
+                    <button type="submit" class="search-btn" id="search-btn" disabled>
+                        🔍 Find Biotools Grants
+                    </button>
+                </div>
             </form>
 
-            <button class="toggle-filters" onclick="toggleAdvancedFilters()">
+            <!-- Validation Messages -->
+            <div class="validation-messages" id="validation-messages">
+                <div class="validation-item">
+                    <span class="validation-icon">⚠️</span>
+                    <span>Please select at least one Tool Type and Focus Area to ensure relevant results</span>
+                </div>
+            </div>
+
+            <!-- Advanced Filters -->
+            <button class="toggle-filters" onclick="toggleAdvancedFilters()" style="background: none; border: none; color: #667eea; cursor: pointer; font-size: 0.9rem; margin-top: 15px; padding: 8px 12px; border-radius: 4px;">
                 🔧 Advanced Filters
             </button>
 
             <div class="advanced-filters" id="advanced-filters">
                 <div class="filter-row">
                     <div class="filter-group">
-                        <label for="agency-filter">Agency</label>
+                        <label for="agency-filter">Agency Focus</label>
                         <select id="agency-filter">
-                            <option value="">All Agencies</option>
-                            <option value="NSF">NSF</option>
-                            <option value="NIH">NIH</option>
-                            <option value="HHS">HHS (SBIR)</option>
-                            <option value="DOD">DOD</option>
-                            <option value="DOE">DOE</option>
-                            <option value="CDC">CDC</option>
-                            <option value="DARPA">DARPA</option>
+                            <option value="">All Biotools Agencies</option>
+                            <option value="NIH">NIH (Biomedical)</option>
+                            <option value="NSF">NSF (Biological Sciences)</option>
+                            <option value="HHS">HHS (SBIR Biotools)</option>
+                            <option value="DOE">DOE (Biological Systems)</option>
+                            <option value="CDC">CDC (Health Tools)</option>
                         </select>
                     </div>
                     <div class="filter-group">
-                        <label for="amount-min">Min Amount ($)</label>
+                        <label for="amount-min">Min Funding ($)</label>
                         <input type="number" id="amount-min" placeholder="50000">
                     </div>
                     <div class="filter-group">
-                        <label for="amount-max">Max Amount ($)</label>
-                        <input type="number" id="amount-max" placeholder="1000000">
-                    </div>
-                </div>
-                <div class="filter-row">
-                    <div class="filter-group">
-                        <label for="deadline-filter">Deadline</label>
+                        <label for="deadline-filter">Application Deadline</label>
                         <select id="deadline-filter">
                             <option value="">Any Deadline</option>
                             <option value="30">Next 30 days</option>
@@ -690,154 +605,244 @@
                             <option value="180">Next 6 months</option>
                         </select>
                     </div>
-                    <div class="filter-group">
-                        <label for="phase-filter">Phase (SBIR/STTR)</label>
-                        <select id="phase-filter">
-                            <option value="">All Phases</option>
-                            <option value="I">Phase I</option>
-                            <option value="II">Phase II</option>
-                            <option value="IB">Phase IB</option>
-                            <option value="IIB">Phase IIB</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label for="keywords-filter">Additional Keywords</label>
-                        <input type="text" id="keywords-filter" placeholder="microfluidics, imaging">
-                    </div>
-                </div>
-                <div class="filter-row">
-                    <div class="filter-group">
-                        <label for="tool-type-filter">Tool Type</label>
-                        <select id="tool-type-filter">
-                            <option value="">All Tool Types</option>
-                            <option value="instrument">Instruments</option>
-                            <option value="software">Software</option>
-                            <option value="assay">Assays</option>
-                            <option value="platform">Platforms</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label for="focus-area-filter">Focus Area</label>
-                        <select id="focus-area-filter">
-                            <option value="">All Focus Areas</option>
-                            <option value="single_cell">Single Cell</option>
-                            <option value="genomics">Genomics</option>
-                            <option value="proteomics">Proteomics</option>
-                            <option value="diagnostics">Diagnostics</option>
-                            <option value="bioinformatics">Bioinformatics</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <!-- Placeholder for future filter -->
-                    </div>
                 </div>
             </div>
 
-            <div class="saved-searches">
-                <h4>Recent Searches:</h4>
-                <div id="recent-searches"></div>
+            <!-- Example Searches -->
+            <div class="example-searches">
+                <h4>💡 Example Biotools Searches:</h4>
+                <span class="example-item" onclick="loadExample('CRISPR screening platform')">CRISPR screening platform</span>
+                <span class="example-item" onclick="loadExample('single cell sequencing workflow')">single cell sequencing workflow</span>
+                <span class="example-item" onclick="loadExample('proteomics mass spectrometry')">proteomics mass spectrometry</span>
+                <span class="example-item" onclick="loadExample('microfluidics cell sorting')">microfluidics cell sorting</span>
+                <span class="example-item" onclick="loadExample('bioinformatics pipeline software')">bioinformatics pipeline software</span>
+                <span class="example-item" onclick="loadExample('spatial transcriptomics platform')">spatial transcriptomics platform</span>
             </div>
         </div>
 
-        <div id="loading" class="loading" style="display: none;">
-            <div class="spinner"></div>
-            Analyzing grants with AI...
-        </div>
-
-        <div id="results-section" class="results-section" style="display: none;">
-            <div class="results-toolbar">
-                <div>
-                    <h2>Search Results</h2>
-                    <span class="results-type-indicator" id="results-type-indicator">
-                        <span class="type-icon">🔍</span>
-                        <span id="type-text">All Data</span>
-                    </span>
-                    <p class="results-count" id="results-count"></p>
-                </div>
-            </div>
-            
-            <div id="results-container"></div>
+        <!-- Results section would go here -->
+        <div id="results-section" style="display: none;">
+            <!-- Results will be populated by JavaScript -->
         </div>
     </div>
 
-    <div id="notification" class="notification"></div>
-
     <script>
-        // Enhanced JavaScript with data type functionality and biotools filters
-        const API_BASE = window.location.origin + '/api';
-        let currentResults = [];
-        let recentSearches = JSON.parse(localStorage.getItem('recentSearches') || '[]');
+        // Enhanced JavaScript for biotools-specific functionality
+        let selectedToolTypes = new Set();
+        let selectedFocusAreas = new Set();
         let currentDataType = 'all';
 
-        // Context help content for each data type
-        const contextHelp = {
-            'all': {
-                title: '💡 Searching All Data',
-                text: 'Find awards, solicitations, and companies across the entire biotools funding ecosystem. Use specific terms like "diagnostic biosensor" or "microfluidics platform" for best results.'
-            },
-            'awards': {
-                title: '🏆 Searching Historical Awards',
-                text: 'Explore past funding awards to identify successful projects, research trends, and potential collaborators. Great for competitive analysis and proposal development.'
-            },
-            'solicitations': {
-                title: '📋 Searching Open Solicitations',
-                text: 'Find active funding opportunities you can apply for right now. Includes SBIR/STTR programs, grants, and other competitive funding announcements.'
-            },
-            'companies': {
-                title: '🏢 Searching Funded Companies',
-                text: 'Discover organizations that have received biotools funding. Useful for partnership opportunities, market research, and understanding the competitive landscape.'
-            }
+        // Biotools-specific search suggestions
+        const biotoolsSuggestions = {
+            'genomics': ['genome sequencing', 'CRISPR editing', 'SNP analysis', 'whole genome sequencing'],
+            'single_cell': ['single cell RNA sequencing', 'cell sorting', 'single cell proteomics', 'droplet microfluidics'],
+            'proteomics': ['mass spectrometry', 'protein identification', 'post-translational modifications', 'protein quantification'],
+            'spatial_biology': ['spatial transcriptomics', 'tissue imaging', 'spatial proteomics', 'cellular mapping'],
+            'bioinformatics': ['sequence analysis', 'pathway analysis', 'data visualization', 'machine learning'],
+            'instrument': ['microscopy', 'flow cytometry', 'DNA sequencer', 'mass spectrometer'],
+            'software': ['analysis pipeline', 'visualization tool', 'database platform', 'algorithm development'],
+            'assay': ['PCR assay', 'immunoassay', 'fluorescence assay', 'biochemical assay']
         };
 
         // Initialize page
         window.addEventListener('load', () => {
-            loadStats();
-            loadRecentSearches();
+            setupTaxonomyHandlers();
+            setupSearchInput();
             setupDataTypeHandlers();
-            document.getElementById('search-form').addEventListener('submit', handleSearch);
+            updateSearchButton();
         });
+
+        function setupTaxonomyHandlers() {
+            // Tool Types
+            document.getElementById('tool-types').addEventListener('click', (e) => {
+                if (e.target.classList.contains('taxonomy-tag')) {
+                    toggleTaxonomyTag(e.target, selectedToolTypes);
+                    updateSearchButton();
+                    updateContextValidation();
+                }
+            });
+
+            // Focus Areas
+            document.getElementById('focus-areas').addEventListener('click', (e) => {
+                if (e.target.classList.contains('taxonomy-tag')) {
+                    toggleTaxonomyTag(e.target, selectedFocusAreas);
+                    updateSearchButton();
+                    updateContextValidation();
+                }
+            });
+        }
+
+        function toggleTaxonomyTag(element, selectedSet) {
+            const value = element.dataset.value;
+            
+            if (selectedSet.has(value)) {
+                selectedSet.delete(value);
+                element.classList.remove('selected');
+            } else {
+                selectedSet.add(value);
+                element.classList.add('selected');
+            }
+        }
 
         function setupDataTypeHandlers() {
             const typeOptions = document.querySelectorAll('input[name="data-type"]');
             
             typeOptions.forEach(option => {
                 option.addEventListener('change', function() {
-                    // Update visual state
                     document.querySelectorAll('.data-type-option').forEach(opt => opt.classList.remove('active'));
                     this.closest('.data-type-option').classList.add('active');
-                    
-                    // Update current data type
                     currentDataType = this.value;
-                    
-                    // Update context help
-                    updateContextHelp(currentDataType);
-                    
-                    // Update search placeholder
-                    updateSearchPlaceholder(currentDataType);
                 });
             });
         }
 
-        function updateContextHelp(dataType) {
-            const helpDiv = document.getElementById('context-help');
-            const help = contextHelp[dataType];
-            
-            helpDiv.innerHTML = `
-                <h4>${help.title}</h4>
-                <p>${help.text}</p>
-            `;
+        function setupSearchInput() {
+            const searchInput = document.getElementById('search-input');
+            const suggestions = document.getElementById('search-suggestions');
+
+            searchInput.addEventListener('input', (e) => {
+                const value = e.target.value.toLowerCase();
+                updateContextValidation();
+                
+                if (value.length > 2) {
+                    showSuggestions(value);
+                } else {
+                    suggestions.style.display = 'none';
+                }
+            });
+
+            searchInput.addEventListener('blur', () => {
+                setTimeout(() => {
+                    suggestions.style.display = 'none';
+                }, 200);
+            });
         }
 
-        function updateSearchPlaceholder(dataType) {
+        function showSuggestions(query) {
+            const suggestions = document.getElementById('search-suggestions');
+            const relevantSuggestions = [];
+
+            // Find relevant suggestions based on selected taxonomy and query
+            for (const [category, terms] of Object.entries(biotoolsSuggestions)) {
+                if (selectedToolTypes.has(category) || selectedFocusAreas.has(category)) {
+                    terms.forEach(term => {
+                        if (term.toLowerCase().includes(query)) {
+                            relevantSuggestions.push({
+                                text: term,
+                                category: category
+                            });
+                        }
+                    });
+                }
+            }
+
+            if (relevantSuggestions.length > 0) {
+                suggestions.innerHTML = relevantSuggestions.slice(0, 5).map(suggestion => `
+                    <div class="suggestion-item" onclick="selectSuggestion('${suggestion.text}')">
+                        <span class="suggestion-type">${suggestion.category}</span>
+                        <span>${suggestion.text}</span>
+                    </div>
+                `).join('');
+                suggestions.style.display = 'block';
+            } else {
+                suggestions.style.display = 'none';
+            }
+        }
+
+        function selectSuggestion(text) {
+            document.getElementById('search-input').value = text;
+            document.getElementById('search-suggestions').style.display = 'none';
+            updateContextValidation();
+        }
+
+        function updateContextValidation() {
             const searchInput = document.getElementById('search-input');
-            const placeholders = {
-                'all': 'Describe your biotools project or research area...',
-                'awards': 'Search historical awards (e.g., "genomic sequencing platform")...',
-                'solicitations': 'Find open opportunities (e.g., "point-of-care diagnostic")...',
-                'companies': 'Search funded companies (e.g., "microfluidics startup")...'
-            };
+            const validation = document.getElementById('context-validation');
+            const query = searchInput.value.toLowerCase();
+
+            // Check if query contains biotools-relevant terms
+            const biotoolsTerms = [
+                'sequencing', 'assay', 'platform', 'microscopy', 'analysis', 'screening',
+                'cell', 'protein', 'dna', 'rna', 'genomic', 'proteomic', 'bioinformatics',
+                'crispr', 'pcr', 'fluorescence', 'imaging', 'cytometry', 'spectrometry'
+            ];
+
+            const hasBiotoolsContext = biotoolsTerms.some(term => query.includes(term)) || 
+                                    selectedToolTypes.size > 0 || selectedFocusAreas.size > 0;
+
+            if (query.length === 0) {
+                validation.style.display = 'none';
+            } else if (hasBiotoolsContext) {
+                validation.className = 'context-validation valid';
+                validation.innerHTML = '<span class="validation-icon">✓</span><span class="validation-text">Search includes biotools context</span>';
+            } else {
+                validation.className = 'context-validation warning';
+                validation.innerHTML = '<span class="validation-icon">⚠️</span><span class="validation-text">Consider adding biotools-specific terms or selecting taxonomy categories</span>';
+            }
+        }
+
+        function updateSearchButton() {
+            const searchBtn = document.getElementById('search-btn');
+            const validationMessages = document.getElementById('validation-messages');
             
-            searchInput.placeholder = placeholders[dataType];
+            const hasMinimumSelection = selectedToolTypes.size > 0 && selectedFocusAreas.size > 0;
+            const hasSearchText = document.getElementById('search-input').value.trim().length > 0;
+            
+            if (hasMinimumSelection && hasSearchText) {
+                searchBtn.disabled = false;
+                validationMessages.classList.remove('show');
+            } else {
+                searchBtn.disabled = true;
+                if (hasSearchText && !hasMinimumSelection) {
+                    validationMessages.classList.add('show');
+                } else {
+                    validationMessages.classList.remove('show');
+                }
+            }
+        }
+
+        function loadExample(exampleText) {
+            document.getElementById('search-input').value = exampleText;
+            
+            // Auto-select relevant taxonomy based on example
+            if (exampleText.includes('CRISPR') || exampleText.includes('sequencing')) {
+                autoSelectTaxonomy(['instrument', 'software'], ['genomics']);
+            } else if (exampleText.includes('single cell')) {
+                autoSelectTaxonomy(['instrument', 'software'], ['single_cell']);
+            } else if (exampleText.includes('proteomics') || exampleText.includes('mass spectrometry')) {
+                autoSelectTaxonomy(['instrument'], ['proteomics']);
+            } else if (exampleText.includes('microfluidics')) {
+                autoSelectTaxonomy(['instrument'], ['cell_biology']);
+            } else if (exampleText.includes('bioinformatics') || exampleText.includes('pipeline')) {
+                autoSelectTaxonomy(['software'], ['bioinformatics']);
+            } else if (exampleText.includes('spatial')) {
+                autoSelectTaxonomy(['instrument', 'software'], ['spatial_biology']);
+            }
+            
+            updateContextValidation();
+            updateSearchButton();
+        }
+
+        function autoSelectTaxonomy(toolTypes, focusAreas) {
+            // Clear current selections
+            selectedToolTypes.clear();
+            selectedFocusAreas.clear();
+            document.querySelectorAll('.taxonomy-tag.selected').forEach(tag => {
+                tag.classList.remove('selected');
+            });
+            
+            // Select suggested categories
+            toolTypes.forEach(type => {
+                selectedToolTypes.add(type);
+                const element = document.querySelector(`[data-value="${type}"]`);
+                if (element) element.classList.add('selected');
+            });
+            
+            focusAreas.forEach(area => {
+                selectedFocusAreas.add(area);
+                const element = document.querySelector(`[data-value="${area}"]`);
+                if (element) element.classList.add('selected');
+            });
         }
 
         function toggleAdvancedFilters() {
@@ -849,407 +854,103 @@
             }
         }
 
-        function showNotification(message, type = 'success') {
-            const notification = document.getElementById('notification');
-            notification.textContent = message;
-            notification.className = `notification ${type}`;
-            notification.classList.add('show');
-            
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 3000);
-        }
-
-        function addToRecentSearches(query) {
-            if (!recentSearches.includes(query)) {
-                recentSearches.unshift(query);
-                recentSearches = recentSearches.slice(0, 10);
-                localStorage.setItem('recentSearches', JSON.stringify(recentSearches));
-                loadRecentSearches();
-            }
-        }
-
-        function loadRecentSearches() {
-            const container = document.getElementById('recent-searches');
-            if (recentSearches.length > 0) {
-                container.innerHTML = recentSearches.map(search => 
-                    `<span class="saved-search-item" onclick="searchRecent('${search}')">${search}</span>`
-                ).join('');
-            } else {
-                container.innerHTML = '<span style="color: #666; font-style: italic;">No recent searches</span>';
-            }
-        }
-
-        function searchRecent(query) {
-            document.getElementById('search-input').value = query;
-            document.getElementById('search-form').dispatchEvent(new Event('submit'));
-        }
-
-        async function handleSearch(event) {
-            event.preventDefault();
+        // Handle form submission
+        document.getElementById('search-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
             
             const query = document.getElementById('search-input').value.trim();
-            if (!query) return;
+            const toolTypes = Array.from(selectedToolTypes);
+            const focusAreas = Array.from(selectedFocusAreas);
+            
+            if (!query || toolTypes.length === 0 || focusAreas.length === 0) {
+                return;
+            }
 
-            showLoading();
-            hideResults();
-
-            // Get filter values including new biotools filters
+            // Construct biotools-contextualized search
+            const biotoolsQuery = constructBiotoolsQuery(query, toolTypes, focusAreas);
+            
+            // Get additional filters
             const filters = {
+                data_type: currentDataType,
                 agency: document.getElementById('agency-filter').value,
                 amount_min: document.getElementById('amount-min').value,
-                amount_max: document.getElementById('amount-max').value,
                 deadline: document.getElementById('deadline-filter').value,
-                phase: document.getElementById('phase-filter').value,
-                keywords: document.getElementById('keywords-filter').value,
-                tool_type: document.getElementById('tool-type-filter').value,    // NEW
-                focus_area: document.getElementById('focus-area-filter').value,  // NEW
-                data_type: currentDataType
+                tool_types: toolTypes,
+                focus_areas: focusAreas,
+                biotools_validated: true
             };
 
             try {
-                const response = await fetch(`${API_BASE}/search`, {
+                const response = await fetch('/api/search', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ 
-                        query, 
-                        limit: 50, 
-                        filters 
+                    body: JSON.stringify({
+                        query: biotoolsQuery,
+                        limit: 50,
+                        filters: filters
                     })
                 });
 
                 const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Search failed');
+                
+                if (response.ok) {
+                    displayResults(data.results, biotoolsQuery, currentDataType);
+                } else {
+                    showError(data.error || 'Search failed');
                 }
-
-                currentResults = data.results;
-                addToRecentSearches(query);
-                displayResults(currentResults, data.query, currentDataType);
-                
-                const typeText = {
-                    'all': 'All Data',
-                    'awards': 'Awards',
-                    'solicitations': 'Solicitations', 
-                    'companies': 'Companies'
-                }[currentDataType];
-                
-                showNotification(`Found ${currentResults.length} ${typeText.toLowerCase()} results!`);
-                
             } catch (error) {
-                showNotification(error.message, 'error');
+                showError('Network error occurred');
                 console.error('Search error:', error);
-            } finally {
-                hideLoading();
             }
+        });
+
+        function constructBiotoolsQuery(userQuery, toolTypes, focusAreas) {
+            // Combine user query with biotools context
+            const contextTerms = [];
+            
+            // Add tool type context
+            toolTypes.forEach(type => {
+                const typeTerms = {
+                    'instrument': ['device', 'equipment', 'platform'],
+                    'assay': ['test', 'protocol', 'method'],
+                    'software': ['tool', 'program', 'algorithm'],
+                    'database_platform': ['database', 'repository', 'resource']
+                };
+                if (typeTerms[type]) {
+                    contextTerms.push(...typeTerms[type]);
+                }
+            });
+            
+            // Add focus area context
+            focusAreas.forEach(area => {
+                const areaTerms = {
+                    'genomics': ['genome', 'DNA', 'sequencing'],
+                    'single_cell': ['single cell', 'cellular'],
+                    'proteomics': ['protein', 'peptide'],
+                    'spatial_biology': ['spatial', 'tissue', 'location'],
+                    'bioinformatics': ['computational', 'analysis']
+                };
+                if (areaTerms[area]) {
+                    contextTerms.push(...areaTerms[area]);
+                }
+            });
+            
+            // Combine user query with the most relevant context terms
+            const relevantContext = contextTerms.slice(0, 3).join(' ');
+            return `${userQuery} ${relevantContext}`.trim();
         }
 
         function displayResults(results, query, dataType) {
-            const resultsSection = document.getElementById('results-section');
-            const resultsContainer = document.getElementById('results-container');
-            const resultsCount = document.getElementById('results-count');
-            const typeIndicator = document.getElementById('results-type-indicator');
-            const typeText = document.getElementById('type-text');
-
-            // Update type indicator
-            const typeInfo = {
-                'all': { icon: '🔍', text: 'All Data' },
-                'awards': { icon: '🏆', text: 'Awards' },
-                'solicitations': { icon: '📋', text: 'Solicitations' },
-                'companies': { icon: '🏢', text: 'Companies' }
-            };
-
-            const info = typeInfo[dataType];
-            typeIndicator.querySelector('.type-icon').textContent = info.icon;
-            typeText.textContent = info.text;
-
-            if (results.length === 0) {
-                resultsContainer.innerHTML = `
-                    <div style="text-align: center; padding: 60px; color: #666;">
-                        <h3>No ${info.text.toLowerCase()} found</h3>
-                        <p>Try adjusting your search terms or filters, or search in a different data type</p>
-                    </div>
-                `;
-            } else {
-                resultsContainer.innerHTML = results.map(result => createResultCard(result, dataType)).join('');
-            }
-
-            resultsCount.textContent = `Found ${results.length} ${info.text.toLowerCase()} for "${query}"`;
-            resultsSection.style.display = 'block';
+            // This would connect to your existing results display system
+            console.log('Displaying results:', results.length, 'for query:', query);
+            // Implementation would integrate with your existing results rendering
         }
 
-       function createResultCard(item, dataType) {
-            // Determine the actual item type from the data
-            let itemType = dataType;
-            let displayType = item.display_type || dataType;
-            
-            if (dataType === 'all') {
-                // Infer type from data structure
-                if (item.grant_type === 'solicitation' || item.solicitation_number) {
-                    itemType = 'solicitations';
-                } else if (item.display_type === 'company' || (dataType === 'companies')) {
-                    itemType = 'companies';
-                } else {
-                    itemType = 'awards'; // default
-                }
-            } else if (dataType === 'companies') {
-                itemType = 'companies';
-                displayType = 'company';
-            }
-
-            const cardClass = `grant-card ${itemType.slice(0, -1)}-card`;
-            
-            if (itemType === 'companies' || displayType === 'company') {
-                return createCompanyCard(item, cardClass);
-            } else if (itemType === 'solicitations') {
-                return createSolicitationCard(item, cardClass);
-            } else {
-                return createAwardCard(item, cardClass);
-            }
-        }
-
-        function createAwardCard(grant, cardClass) {
-            const amount = grant.amount_max || grant.award_amount ? 
-                `${formatNumber(grant.amount_max || grant.award_amount)}` : 'Amount varies';
-            const keywords = grant.keywords ? grant.keywords.split(',').slice(0, 5) : [];
-            const description = grant.description ? 
-                (grant.description.length > 300 ? grant.description.substring(0, 300) + '...' : grant.description) 
-                : 'No description available';
-
-            const company = grant.company_name || grant.firm || grant.eligibility || 'Research Institution';
-            const year = grant.award_year ? ` (${grant.award_year})` : '';
-            const phase = grant.phase ? ` • Phase ${grant.phase}` : '';
-
-            return `
-                <div class="${cardClass}" data-item-id="${grant.id}">
-                    <div class="relevance-score">${grant.relevance_score?.toFixed(1) || '0.0'}</div>
-                    <span class="grant-type-badge badge-award">🏆 Award</span>
-                    <h3 class="grant-title">${escapeHtml(grant.title || 'Untitled Award')}</h3>
-                    <div class="grant-meta">
-                        <span class="grant-agency">${escapeHtml(grant.agency || 'Unknown Agency')}</span>
-                        <span class="grant-amount">${amount}</span>
-                        <span>Company: ${escapeHtml(company)}${year}</span>
-                        ${phase ? `<span>${phase}</span>` : ''}
-                        <span>ID: ${escapeHtml(grant.funding_opportunity_number || grant.contract_number || 'N/A')}</span>
-                    </div>
-                    <div class="grant-description">
-                        ${escapeHtml(description)}
-                    </div>
-                    ${keywords.length > 0 ? `
-                        <div class="grant-keywords">
-                            ${keywords.map(keyword => `<span class="keyword-tag">${escapeHtml(keyword.trim())}</span>`).join('')}
-                        </div>
-                    ` : ''}
-                    <div class="grant-actions">
-                        <button class="action-btn btn-primary" onclick="viewItemDetails(${grant.id}, 'award')">
-                            📋 View Details
-                        </button>
-                        ${grant.url ? `<a href="${escapeHtml(grant.url)}" target="_blank" class="action-btn btn-secondary">🔗 Official Page</a>` : ''}
-                        <button class="action-btn btn-secondary" onclick="findSimilarAwards(${grant.id})">
-                            🔍 Find Similar
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-
-        function createSolicitationCard(grant, cardClass) {
-            const keywords = grant.keywords ? grant.keywords.split(',').slice(0, 5) : [];
-            const description = grant.description ? 
-                (grant.description.length > 300 ? grant.description.substring(0, 300) + '...' : grant.description) 
-                : 'No description available';
-
-            // Calculate deadline urgency
-            let deadlineInfo = '';
-            let deadlineClass = '';
-            if (grant.close_date || grant.deadline) {
-                try {
-                    const deadline = new Date(grant.close_date || grant.deadline);
-                    const now = new Date();
-                    const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
-                    
-                    if (daysUntil < 0) {
-                        deadlineInfo = 'Closed';
-                        deadlineClass = 'grant-deadline';
-                    } else if (daysUntil <= 30) {
-                        deadlineInfo = `${daysUntil} days left`;
-                        deadlineClass = 'grant-deadline';
-                    } else if (daysUntil <= 90) {
-                        deadlineInfo = `${daysUntil} days left`;
-                        deadlineClass = 'grant-deadline upcoming';
-                    } else {
-                        deadlineInfo = `${daysUntil} days left`;
-                        deadlineClass = 'grant-deadline far';
-                    }
-                } catch (e) {
-                    deadlineInfo = escapeHtml(grant.close_date || grant.deadline);
-                    deadlineClass = 'grant-deadline far';
-                }
-            }
-
-            const phase = grant.phase ? ` • Phase ${grant.phase}` : '';
-            const status = grant.current_status ? ` • ${grant.current_status}` : '';
-
-            return `
-                <div class="${cardClass}" data-item-id="${grant.id}">
-                    <div class="relevance-score">${grant.relevance_score?.toFixed(1) || '0.0'}</div>
-                    <span class="grant-type-badge badge-solicitation">📋 Solicitation</span>
-                    <h3 class="grant-title">${escapeHtml(grant.title || grant.solicitation_title || 'Untitled Solicitation')}</h3>
-                    <div class="grant-meta">
-                        <span class="grant-agency">${escapeHtml(grant.agency || 'Unknown Agency')}</span>
-                        ${deadlineInfo ? `<span class="${deadlineClass}">${deadlineInfo}</span>` : ''}
-                        ${phase ? `<span>${phase}</span>` : ''}
-                        ${status ? `<span>${status}</span>` : ''}
-                        <span>ID: ${escapeHtml(grant.funding_opportunity_number || grant.solicitation_number || 'N/A')}</span>
-                    </div>
-                    <div class="grant-description">
-                        ${escapeHtml(description)}
-                    </div>
-                    ${keywords.length > 0 ? `
-                        <div class="grant-keywords">
-                            ${keywords.map(keyword => `<span class="keyword-tag">${escapeHtml(keyword.trim())}</span>`).join('')}
-                        </div>
-                    ` : ''}
-                    <div class="grant-actions">
-                        <button class="action-btn btn-apply" onclick="viewItemDetails(${grant.id}, 'solicitation')">
-                            📝 Apply Now
-                        </button>
-                        ${grant.url || grant.solicitation_agency_url ? `<a href="${escapeHtml(grant.url || grant.solicitation_agency_url)}" target="_blank" class="action-btn btn-secondary">🔗 Official Page</a>` : ''}
-                        <button class="action-btn btn-secondary" onclick="findSimilarSolicitations(${grant.id})">
-                            🔍 Find Similar
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-
-        function createCompanyCard(grant, cardClass) {
-            const keywords = grant.keywords ? grant.keywords.split(',').slice(0, 5) : [];
-            const description = grant.description ? 
-                (grant.description.length > 300 ? grant.description.substring(0, 300) + '...' : grant.description) 
-                : 'No description available';
-
-            const companyName = grant.company_name || grant.firm || grant.title;
-            const location = [grant.company_city, grant.company_state].filter(Boolean).join(', ') || grant.city && grant.state ? `${grant.city}, ${grant.state}` : '';
-            const totalFunding = grant.amount_max || grant.award_amount || 0;
-            const employees = grant.number_employees ? `${grant.number_employees} employees` : '';
-            
-            // Company characteristics
-            const characteristics = [];
-            if (grant.women_owned === true || grant.women_owned === 'Y') characteristics.push('Women-owned');
-            if (grant.hubzone_owned === true || grant.hubzone_owned === 'Y') characteristics.push('HUBZone');
-            if (grant.socially_economically_disadvantaged === true || grant.socially_economically_disadvantaged === 'Y') characteristics.push('SED');
-
-            return `
-                <div class="${cardClass}" data-item-id="${grant.id}">
-                    <div class="relevance-score">${grant.relevance_score?.toFixed(1) || '0.0'}</div>
-                    <span class="grant-type-badge badge-company">🏢 Company</span>
-                    <h3 class="grant-title">${escapeHtml(companyName || 'Unknown Company')}</h3>
-                    <div class="grant-meta">
-                        <span class="grant-agency">${escapeHtml(grant.agency || 'Multiple Agencies')}</span>
-                        ${totalFunding > 0 ? `<span class="grant-amount">${formatNumber(totalFunding)} received</span>` : ''}
-                        ${location ? `<span>📍 ${escapeHtml(location)}</span>` : ''}
-                        ${employees ? `<span>👥 ${employees}</span>` : ''}
-                        ${grant.uei || grant.company_uei ? `<span>UEI: ${escapeHtml(grant.uei || grant.company_uei)}</span>` : ''}
-                    </div>
-                    ${characteristics.length > 0 ? `
-                        <div class="grant-keywords">
-                            ${characteristics.map(char => `<span class="keyword-tag">${char}</span>`).join('')}
-                        </div>
-                    ` : ''}
-                    <div class="grant-description">
-                        ${escapeHtml(description)}
-                    </div>
-                    ${keywords.length > 0 ? `
-                        <div class="grant-keywords">
-                            ${keywords.map(keyword => `<span class="keyword-tag">${escapeHtml(keyword.trim())}</span>`).join('')}
-                        </div>
-                    ` : ''}
-                    <div class="grant-actions">
-                        <button class="action-btn btn-primary" onclick="viewItemDetails(${grant.id}, 'company')">
-                            🏢 Company Profile
-                        </button>
-                        ${grant.company_url ? `<a href="${escapeHtml(grant.company_url)}" target="_blank" class="action-btn btn-secondary">🌐 Website</a>` : ''}
-                        <button class="action-btn btn-secondary" onclick="findCompanyAwards(${grant.id})">
-                            🏆 View Awards
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-
-        function showLoading() {
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('search-btn').disabled = true;
-            document.getElementById('search-btn').textContent = 'Searching...';
-        }
-
-        function hideLoading() {
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('search-btn').disabled = false;
-            document.getElementById('search-btn').textContent = '🔍 Find Grants';
-        }
-
-        function hideResults() {
-            document.getElementById('results-section').style.display = 'none';
-        }
-
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        function formatNumber(num) {
-            if (num >= 1000000) {
-                return (num / 1000000).toFixed(1) + 'M';
-            } else if (num >= 1000) {
-                return (num / 1000).toFixed(0) + 'K';
-            }
-            return num.toLocaleString();
-        }
-
-        async function loadStats() {
-            try {
-                const response = await fetch(`${API_BASE}/stats`);
-                if (response.ok) {
-                    const stats = await response.json();
-                    
-                    // Update stats with type-specific counts
-                    document.getElementById('total-awards').textContent = stats.awards_count || stats.total_grants || 0;
-                    document.getElementById('total-solicitations').textContent = stats.solicitations_count || 0;
-                    document.getElementById('total-companies').textContent = stats.companies_count || 0;
-                } else {
-                    console.error('Failed to load stats:', response.status);
-                }
-            } catch (error) {
-                console.error('Failed to load stats:', error);
-            }
-        }
-
-        // Enhanced interaction functions
-        function viewItemDetails(itemId, itemType) {
-            showNotification(`Opening ${itemType} details...`);
-            // This would open a detailed view modal or navigate to a detail page
-        }
-
-        function findSimilarAwards(awardId) {
-            showNotification('Finding similar awards...');
-            // This would perform a search for similar awards
-        }
-
-        function findSimilarSolicitations(solicitationId) {
-            showNotification('Finding similar opportunities...');
-            // This would perform a search for similar solicitations
-        }
-
-        function findCompanyAwards(companyId) {
-            showNotification('Loading company award history...');
-            // This would show all awards received by this company
+        function showError(message) {
+            // Error display implementation
+            console.error('Search error:', message);
         }
     </script>
 </body>
