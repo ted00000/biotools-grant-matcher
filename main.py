@@ -7,6 +7,7 @@ Key improvements:
 - Negative filtering for non-biotools domains  
 - Compound search strategy with biological context
 - Enhanced semantic scoring with biotools specificity
+- Optional search text with browse mode support
 """
 
 from flask import Flask, request, jsonify, render_template
@@ -253,325 +254,6 @@ class EnhancedBiotoolsMatcher:
             
         except Exception as e:
             logger.error(f"Error building IDF cache: {e}")
-        finally:
-            conn.close()
-    
-    def _extract_biotools_terms(self, text: str) -> List[str]:
-        """Extract biotools-relevant terms only"""
-        if not text:
-            return []
-            
-        # Clean text
-        text = re.sub(r'[^\w\s]', ' ', text)
-        terms = text.split()
-        
-        # Biotools stop words (domain-specific)
-        biotools_stop_words = {
-            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 
-            'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 
-            'do', 'does', 'did', 'will', 'would', 'could', 'should', 'this', 'that', 
-            'these', 'those', 'can', 'may', 'might', 'must', 'shall', 'from', 'up', 
-            'out', 'down', 'off', 'over', 'under', 'again', 'further', 'then', 'once',
-            # Domain-specific stop words
-            'research', 'study', 'development', 'project', 'system', 'method', 'approach'
-        }
-        
-        # Filter and return only biotools-relevant terms
-        filtered_terms = []
-        for term in terms:
-            if (len(term) > 2 and 
-                term.lower() not in biotools_stop_words and 
-                self._is_biotools_term(term)):
-                filtered_terms.append(term)
-        
-        return filtered_terms
-    
-    def _is_biotools_term(self, term: str) -> bool:
-        """Check if a term is biotools-relevant"""
-        term_lower = term.lower()
-        
-        # Check against all biotools keywords
-        for tool_type_data in self.tool_types.values():
-            if term_lower in [kw.lower() for kw in tool_type_data['keywords']]:
-                return True
-        
-        for focus_area_data in self.focus_areas.values():
-            if term_lower in [kw.lower() for kw in focus_area_data['keywords']]:
-                return True
-        
-        # Check compound terms
-        for tool_type_data in self.tool_types.values():
-            for compound in tool_type_data['compound_terms']:
-                if term_lower in compound.lower():
-                    return True
-        
-        for focus_area_data in self.focus_areas.values():
-            for compound in focus_area_data['compound_terms']:
-                if term_lower in compound.lower():
-                    return True
-        
-        return False
-    
-    def _validate_biotools_query(self, query: str, tool_types: List[str], 
-                                focus_areas: List[str]) -> Dict[str, Any]:
-        """Validate that search meets biotools precision requirements"""
-        validation = {
-            'valid': True,
-            'score': 0.0,
-            'issues': [],
-            'suggestions': []
-        }
-        
-        # Requirement 1: Must have taxonomy selection
-        if not tool_types or not focus_areas:
-            validation['valid'] = False
-            validation['issues'].append("Must select at least one Tool Type and Focus Area")
-            return validation
-        
-        # Requirement 2: Query should contain biotools-relevant terms
-        query_lower = query.lower()
-        biotools_terms_found = []
-        
-        # Check for explicit biotools terms
-        for tool_type in tool_types:
-            if tool_type in self.tool_types:
-                for keyword in self.tool_types[tool_type]['keywords']:
-                    if keyword in query_lower:
-                        biotools_terms_found.append(keyword)
-        
-        for focus_area in focus_areas:
-            if focus_area in self.focus_areas:
-                for keyword in self.focus_areas[focus_area]['keywords']:
-                    if keyword in query_lower:
-                        biotools_terms_found.append(keyword)
-        
-        # Requirement 3: Check for non-biotools contamination
-        contamination_found = []
-        for domain, terms in self.excluded_domains.items():
-            for term in terms:
-                if term in query_lower:
-                    contamination_found.append((domain, term))
-        
-        if contamination_found:
-            validation['valid'] = False
-            validation['issues'].append(f"Query contains non-biotools terms: {[term for _, term in contamination_found]}")
-        
-        # Calculate validation score
-        if biotools_terms_found:
-            validation['score'] += len(biotools_terms_found) * 2.0
-        
-        if len(tool_types) > 0:
-            validation['score'] += len(tool_types) * 1.0
-        
-        if len(focus_areas) > 0:
-            validation['score'] += len(focus_areas) * 1.0
-        
-        # Subtract for contamination
-        validation['score'] -= len(contamination_found) * 3.0
-        
-        # Suggestions for improvement
-        if validation['score'] < 3.0:
-            validation['suggestions'].append("Consider adding more specific biotools terms")
-        
-        if not biotools_terms_found:
-            validation['suggestions'].append("Add technical terms related to your selected tool types and focus areas")
-        
-        return validation
-    
-    def _expand_biotools_query(self, query: str, tool_types: List[str], 
-                              focus_areas: List[str]) -> str:
-        """Expand query with biotools-specific context"""
-        expanded_terms = [query]
-        
-        # Add relevant compound terms from selected taxonomy
-        for tool_type in tool_types:
-            if tool_type in self.tool_types:
-                # Add most relevant compound terms
-                relevant_compounds = []
-                for compound in self.tool_types[tool_type]['compound_terms']:
-                    if any(word in query.lower() for word in compound.split()):
-                        relevant_compounds.append(compound)
-                
-                expanded_terms.extend(relevant_compounds[:2])  # Limit to 2 most relevant
-        
-        for focus_area in focus_areas:
-            if focus_area in self.focus_areas:
-                # Add most relevant compound terms
-                relevant_compounds = []
-                for compound in self.focus_areas[focus_area]['compound_terms']:
-                    if any(word in query.lower() for word in compound.split()):
-                        relevant_compounds.append(compound)
-                
-                expanded_terms.extend(relevant_compounds[:2])  # Limit to 2 most relevant
-        
-        return ' '.join(expanded_terms)
-    
-    def _calculate_biotools_semantic_score(self, query: str, grant: Dict[str, Any], 
-                                         tool_types: List[str], focus_areas: List[str]) -> float:
-        """Enhanced semantic scoring with biotools specificity"""
-        score = 0.0
-        grant_text = f"{grant.get('title', '')} {grant.get('description', '')} {grant.get('keywords', '')}".lower()
-        query_lower = query.lower()
-        
-        # Tool type alignment scoring
-        for tool_type in tool_types:
-            if tool_type in self.tool_types:
-                type_data = self.tool_types[tool_type]
-                
-                # Keyword matches
-                for keyword in type_data['keywords']:
-                    if keyword in grant_text:
-                        score += 3.0
-                
-                # Compound term matches (higher weight)
-                for compound in type_data['compound_terms']:
-                    if compound.lower() in grant_text:
-                        score += 5.0
-        
-        # Focus area alignment scoring
-        for focus_area in focus_areas:
-            if focus_area in self.focus_areas:
-                area_data = self.focus_areas[focus_area]
-                
-                # Keyword matches
-                for keyword in area_data['keywords']:
-                    if keyword in grant_text:
-                        score += 3.0
-                
-                # Compound term matches (higher weight)
-                for compound in area_data['compound_terms']:
-                    if compound.lower() in grant_text:
-                        score += 5.0
-        
-        # Cross-domain relevance (tool type + focus area combinations)
-        cross_domain_bonus = 0.0
-        for tool_type in tool_types:
-            for focus_area in focus_areas:
-                if self._has_cross_domain_relevance(grant_text, tool_type, focus_area):
-                    cross_domain_bonus += 2.0
-        
-        score += min(cross_domain_bonus, 10.0)  # Cap cross-domain bonus
-        
-        # Penalize non-biotools contamination
-        contamination_penalty = 0.0
-        for domain, terms in self.excluded_domains.items():
-            for term in terms:
-                if term in grant_text:
-                    contamination_penalty += 5.0
-        
-        score = max(0.0, score - contamination_penalty)
-        
-        return min(score, 25.0)  # Cap total semantic score
-    
-    def _has_cross_domain_relevance(self, text: str, tool_type: str, focus_area: str) -> bool:
-        """Check for cross-domain biotools relevance"""
-        # Define high-value combinations
-        high_value_combinations = {
-            ('instrument', 'genomics'): ['sequencer', 'PCR', 'DNA analyzer'],
-            ('instrument', 'single_cell'): ['flow cytometer', 'cell sorter', 'droplet'],
-            ('software', 'bioinformatics'): ['analysis pipeline', 'algorithm', 'computational'],
-            ('assay', 'proteomics'): ['mass spectrometry', 'protein assay', 'immunoassay'],
-            ('instrument', 'spatial_biology'): ['imaging', 'microscopy', 'spatial analysis']
-        }
-        
-        combination_key = (tool_type, focus_area)
-        if combination_key in high_value_combinations:
-            terms = high_value_combinations[combination_key]
-            return any(term in text for term in terms)
-        
-        return False
-    
-    def search_grants(self, query: str, limit: int = 20, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-        """Enhanced biotools-specific search with mandatory validation"""
-        if not filters:
-            filters = {}
-        
-        # Extract biotools taxonomy from filters
-        tool_types = filters.get('tool_types', [])
-        focus_areas = filters.get('focus_areas', [])
-        
-        # Validate biotools requirements
-        validation = self._validate_biotools_query(query, tool_types, focus_areas)
-        
-        if not validation['valid']:
-            logger.warning(f"Biotools validation failed for query '{query}': {validation['issues']}")
-            # Return empty results for invalid biotools queries
-            return []
-        
-        # Expand query with biotools context
-        expanded_query = self._expand_biotools_query(query, tool_types, focus_areas)
-        logger.info(f"Expanded biotools query: '{query}' -> '{expanded_query}'")
-        
-        # Get data type filter
-        data_type = filters.get('data_type', 'all')
-        
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        try:
-            cursor.execute("SELECT * FROM grants")
-            all_grants = cursor.fetchall()
-            
-            if not all_grants:
-                return []
-            
-            scored_grants = []
-            
-            for row in all_grants:
-                grant = dict(row)
-                
-                # Apply data type filter early
-                if data_type != 'all':
-                    if data_type == 'awards' and self._determine_data_type(grant) != 'award':
-                        continue
-                    elif data_type == 'solicitations' and self._determine_data_type(grant) != 'solicitation':
-                        continue
-                    elif data_type == 'companies' and not grant.get('company_name'):
-                        continue
-                
-                combined_text = f"{grant.get('title', '')} {grant.get('description', '')} {grant.get('keywords', '')}"
-                
-                # Pre-filter: Must contain biotools-relevant terms
-                if not self._has_biotools_relevance(combined_text, tool_types, focus_areas):
-                    continue
-                
-                # Calculate scores with biotools focus
-                query_terms = self._extract_biotools_terms(expanded_query.lower())
-                
-                tf_idf_score = self._calculate_tf_idf_score(query_terms, combined_text)
-                semantic_score = self._calculate_biotools_semantic_score(expanded_query, grant, tool_types, focus_areas)
-                keyword_score = self._calculate_biotools_keyword_score(expanded_query, grant, tool_types, focus_areas)
-                freshness_score = self._calculate_freshness_score(grant)
-                
-                # Biotools-specific weighting
-                final_score = (
-                    tf_idf_score * 0.20 +
-                    semantic_score * 0.45 +  # Higher weight for semantic matching in biotools
-                    keyword_score * 0.30 +
-                    freshness_score * 0.05
-                )
-                
-                # Higher threshold for biotools precision
-                if final_score > 3.0:  # Stricter threshold to ensure biotools relevance
-                    grant['relevance_score'] = round(final_score, 2)
-                    grant['biotools_validation_score'] = validation['score']
-                    grant['inferred_type'] = self._determine_data_type(grant)
-                    scored_grants.append(grant)
-            
-            # Apply additional filters
-            if filters:
-                scored_grants = self._apply_filters(scored_grants, filters)
-            
-            # Sort by relevance and biotools specificity
-            scored_grants.sort(key=lambda x: (x['relevance_score'], x.get('biotools_validation_score', 0)), reverse=True)
-            
-            logger.info(f"Biotools search returned {len(scored_grants)} validated results for '{query}'")
-            return scored_grants[:limit]
-            
-        except Exception as e:
-            logger.error(f"Biotools search error for '{query}': {e}")
-            return []
         finally:
             conn.close()
     
@@ -986,10 +668,16 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/<int:grant_id>')
+def grant_detail_page(grant_id):
+    """Serve grant detail page"""
+    return render_template('index.html')
+
+
 @app.route('/api/search', methods=['POST'])
 @limiter.limit("50 per hour;5 per minute")
 def search_grants():
-    """Enhanced biotools search with mandatory taxonomy validation"""
+    """Enhanced biotools search with mandatory taxonomy validation and browse mode support"""
     client_ip = get_remote_address()
     
     try:
@@ -997,19 +685,15 @@ def search_grants():
         if not data:
             return jsonify({'error': 'No JSON data provided'}), 400
         
-        # Validate required fields for biotools search
-        required_fields = ['query']
-        for field in required_fields:
-            if field not in data or not data[field]:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
-        
-        query = data['query'].strip()
+        # Query is now optional (can be empty for browse mode)
+        query = data.get('query', '').strip()
         limit = min(data.get('limit', 20), 50)
         filters = data.get('filters', {})
         
         # Extract biotools taxonomy requirements
         tool_types = filters.get('tool_types', [])
         focus_areas = filters.get('focus_areas', [])
+        browse_mode = filters.get('browse_mode', False) or len(query) == 0
         
         # Validate biotools requirements
         if not tool_types or not focus_areas:
@@ -1022,26 +706,36 @@ def search_grants():
                 }
             }), 400
         
-        if len(query.strip()) < 3:
-            return jsonify({'error': 'Query too short (minimum 3 characters)'}), 400
+        # Validate query if provided (not in browse mode)
+        if not browse_mode and len(query) < 2:
+            return jsonify({'error': 'Query too short (minimum 2 characters)'}), 400
         
-        # Check for suspicious patterns
-        suspicious_patterns = ['union', 'select', 'drop', 'delete', 'insert', '--', '/*', '*/', ';']
-        query_lower = query.lower()
-        if any(pattern in query_lower for pattern in suspicious_patterns):
-            logger.warning(f"Suspicious query detected from {client_ip}: {query}")
-            return jsonify({'error': 'Invalid query format'}), 400
+        # Check for suspicious patterns in query if provided
+        if query:
+            suspicious_patterns = ['union', 'select', 'drop', 'delete', 'insert', '--', '/*', '*/', ';']
+            query_lower = query.lower()
+            if any(pattern in query_lower for pattern in suspicious_patterns):
+                logger.warning(f"Suspicious query detected from {client_ip}: {query}")
+                return jsonify({'error': 'Invalid query format'}), 400
         
         # Perform biotools-validated search
         grants = biotools_matcher.search_grants(query, limit, filters)
         
         # Log the search with biotools context
         data_type = filters.get('data_type', 'all')
-        logger.info(f"Biotools search: query='{query}', types={tool_types}, areas={focus_areas}, results={len(grants)}, ip={client_ip}")
+        mode = "browse" if browse_mode else "search"
+        logger.info(f"Biotools {mode}: query='{query}', types={tool_types}, areas={focus_areas}, results={len(grants)}, ip={client_ip}")
+        
+        # Create display query for frontend
+        if browse_mode:
+            display_query = f"Browsing: {', '.join(tool_types)} • {', '.join(focus_areas)}"
+        else:
+            display_query = query
         
         return jsonify({
-            'query': query,
-            'expanded_query': biotools_matcher._expand_biotools_query(query, tool_types, focus_areas),
+            'query': display_query,
+            'original_query': query,
+            'browse_mode': browse_mode,
             'data_type': data_type,
             'tool_types': tool_types,
             'focus_areas': focus_areas,
@@ -1109,6 +803,82 @@ def get_stats():
         }), 500
 
 
+@app.route('/api/feedback', methods=['POST'])
+@limiter.limit("20 per hour;2 per minute")
+def submit_feedback():
+    """Submit user feedback with validation"""
+    client_ip = get_remote_address()
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        
+        # Validate required fields
+        required_fields = ['grant_id', 'feedback_type']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        # Validate values
+        valid_types = ['helpful', 'not_helpful', 'applied', 'bookmarked']
+        if data['feedback_type'] not in valid_types:
+            return jsonify({'error': 'Invalid feedback type'}), 400
+        
+        grant_id = data['grant_id']
+        if not isinstance(grant_id, int) or grant_id <= 0:
+            return jsonify({'error': 'Invalid grant ID'}), 400
+        
+        # Sanitize text fields
+        notes = data.get('notes', '')
+        if len(notes) > 500:
+            return jsonify({'error': 'Notes too long (maximum 500 characters)'}), 400
+        
+        search_query = data.get('search_query', '')
+        if len(search_query) > 200:
+            return jsonify({'error': 'Search query too long (maximum 200 characters)'}), 400
+        
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS grant_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                grant_id INTEGER NOT NULL,
+                search_query TEXT,
+                feedback_type TEXT CHECK (feedback_type IN ('helpful', 'not_helpful', 'applied', 'bookmarked')),
+                user_session TEXT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                notes TEXT,
+                FOREIGN KEY (grant_id) REFERENCES grants(id) ON DELETE CASCADE
+            )
+        """)
+        
+        cursor.execute("""
+            INSERT INTO grant_feedback 
+            (grant_id, search_query, feedback_type, user_session, notes, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            grant_id,
+            search_query,
+            data['feedback_type'],
+            client_ip,
+            notes,
+            datetime.now().isoformat()
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Feedback submitted: grant_id={grant_id}, type={data['feedback_type']}, ip={client_ip}")
+        
+        return jsonify({'status': 'success', 'message': 'Feedback recorded'})
+        
+    except Exception as e:
+        logger.error(f"Feedback error from {client_ip}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
 @app.route('/api/validate-biotools', methods=['POST'])
 @limiter.limit("30 per hour;3 per minute")
 def validate_biotools_query():
@@ -1126,12 +896,33 @@ def validate_biotools_query():
         
         return jsonify({
             'validation': validation,
-            'suggestions': biotools_matcher._get_biotools_suggestions(query, tool_types, focus_areas)
+            'browse_mode_enabled': len(tool_types) > 0 and len(focus_areas) > 0
         })
         
     except Exception as e:
         logger.error(f"Validation error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Endpoint not found'}), 404
+
+
+@app.errorhandler(429)
+def rate_limit_handler(error):
+    client_ip = get_remote_address()
+    logger.warning(f"Rate limit exceeded for {client_ip}")
+    return jsonify({
+        'error': 'Rate limit exceeded',
+        'message': 'Please wait before making more requests'
+    }), 429
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {error}")
+    return jsonify({'error': 'Internal server error'}), 500
 
 
 if __name__ == '__main__':
@@ -1148,3 +939,415 @@ if __name__ == '__main__':
         logger.info(f"Breakdown: {stats['awards_count']} awards, {stats['solicitations_count']} solicitations, {stats['companies_count']} companies")
     
     app.run(debug=False, host='0.0.0.0', port=5000)
+    
+    def _extract_biotools_terms(self, text: str) -> List[str]:
+        """Extract biotools-relevant terms only"""
+        if not text:
+            return []
+            
+        text = re.sub(r'[^\w\s]', ' ', text)
+        terms = text.split()
+        
+        # Biotools stop words (domain-specific)
+        biotools_stop_words = {
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 
+            'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 
+            'do', 'does', 'did', 'will', 'would', 'could', 'should', 'this', 'that', 
+            'these', 'those', 'can', 'may', 'might', 'must', 'shall', 'from', 'up', 
+            'out', 'down', 'off', 'over', 'under', 'again', 'further', 'then', 'once',
+            # Domain-specific stop words
+            'research', 'study', 'development', 'project', 'system', 'method', 'approach'
+        }
+        
+        # Filter and return only biotools-relevant terms
+        filtered_terms = []
+        for term in terms:
+            if (len(term) > 2 and 
+                term.lower() not in biotools_stop_words and 
+                self._is_biotools_term(term)):
+                filtered_terms.append(term)
+        
+        return filtered_terms
+    
+    def _is_biotools_term(self, term: str) -> bool:
+        """Check if a term is biotools-relevant"""
+        term_lower = term.lower()
+        
+        # Check against all biotools keywords
+        for tool_type_data in self.tool_types.values():
+            if term_lower in [kw.lower() for kw in tool_type_data['keywords']]:
+                return True
+        
+        for focus_area_data in self.focus_areas.values():
+            if term_lower in [kw.lower() for kw in focus_area_data['keywords']]:
+                return True
+        
+        # Check compound terms
+        for tool_type_data in self.tool_types.values():
+            for compound in tool_type_data['compound_terms']:
+                if term_lower in compound.lower():
+                    return True
+        
+        for focus_area_data in self.focus_areas.values():
+            for compound in focus_area_data['compound_terms']:
+                if term_lower in compound.lower():
+                    return True
+        
+        return False
+    
+    def _validate_biotools_query(self, query: str, tool_types: List[str], 
+                                focus_areas: List[str]) -> Dict[str, Any]:
+        """Validate that search meets biotools precision requirements - supports browse mode"""
+        validation = {
+            'valid': True,
+            'score': 0.0,
+            'issues': [],
+            'suggestions': [],
+            'browse_mode': len(query.strip()) == 0
+        }
+        
+        # Requirement 1: Must have taxonomy selection
+        if not tool_types or not focus_areas:
+            validation['valid'] = False
+            validation['issues'].append("Must select at least one Tool Type and Focus Area")
+            return validation
+        
+        # For browse mode (no query text), taxonomy selection is sufficient
+        if validation['browse_mode']:
+            validation['score'] = 5.0  # High score for valid taxonomy selection
+            validation['suggestions'].append("Browsing all grants in selected categories")
+            return validation
+        
+        # For text queries, check biotools relevance and contamination
+        query_lower = query.lower()
+        biotools_terms_found = []
+        
+        # Check for explicit biotools terms
+        for tool_type in tool_types:
+            if tool_type in self.tool_types:
+                for keyword in self.tool_types[tool_type]['keywords']:
+                    if keyword in query_lower:
+                        biotools_terms_found.append(keyword)
+        
+        for focus_area in focus_areas:
+            if focus_area in self.focus_areas:
+                for keyword in self.focus_areas[focus_area]['keywords']:
+                    if keyword in query_lower:
+                        biotools_terms_found.append(keyword)
+        
+        # Check for excluded domains (negative scoring)
+        contamination_found = []
+        for domain_name, domain_terms in self.excluded_domains.items():
+            for term in domain_terms:
+                if term.lower() in query_lower:
+                    contamination_found.append((domain_name, term))
+        
+        if contamination_found:
+            validation['valid'] = False
+            validation['issues'].append(f"Query contains non-biotools terms: {[term for _, term in contamination_found]}")
+        
+        # Calculate validation score
+        if biotools_terms_found:
+            validation['score'] += len(biotools_terms_found) * 2.0
+        
+        if len(tool_types) > 0:
+            validation['score'] += len(tool_types) * 1.0
+        
+        if len(focus_areas) > 0:
+            validation['score'] += len(focus_areas) * 1.0
+        
+        # Subtract for contamination
+        validation['score'] -= len(contamination_found) * 3.0
+        
+        # For text queries, require some relevance
+        if not validation['browse_mode']:
+            validation['is_relevant'] = (
+                validation['score'] > 2.0 and
+                len(contamination_found) <= 1
+            )
+        
+        # Suggestions for improvement
+        if validation['score'] < 3.0 and not validation['browse_mode']:
+            validation['suggestions'].append("Consider adding more specific biotools terms")
+        
+        if not biotools_terms_found and not validation['browse_mode']:
+            validation['suggestions'].append("Add technical terms related to your selected tool types and focus areas")
+        
+        return validation
+    
+    def _expand_biotools_query(self, query: str, tool_types: List[str], 
+                              focus_areas: List[str]) -> str:
+        """Expand query with biotools-specific context"""
+        expanded_terms = [query]
+        
+        # Add relevant compound terms from selected taxonomy
+        for tool_type in tool_types:
+            if tool_type in self.tool_types:
+                # Add most relevant compound terms
+                relevant_compounds = []
+                for compound in self.tool_types[tool_type]['compound_terms']:
+                    if any(word in query.lower() for word in compound.split()):
+                        relevant_compounds.append(compound)
+                
+                expanded_terms.extend(relevant_compounds[:2])  # Limit to 2 most relevant
+        
+        for focus_area in focus_areas:
+            if focus_area in self.focus_areas:
+                # Add most relevant compound terms
+                relevant_compounds = []
+                for compound in self.focus_areas[focus_area]['compound_terms']:
+                    if any(word in query.lower() for word in compound.split()):
+                        relevant_compounds.append(compound)
+                
+                expanded_terms.extend(relevant_compounds[:2])  # Limit to 2 most relevant
+        
+        return ' '.join(expanded_terms)
+    
+    def _create_taxonomy_query(self, tool_types: List[str], focus_areas: List[str]) -> str:
+        """Create a query based on selected taxonomy for browse mode"""
+        query_terms = []
+        
+        # Add tool type keywords
+        for tool_type in tool_types:
+            if tool_type in self.tool_types:
+                query_terms.extend(self.tool_types[tool_type]['keywords'][:3])  # Top 3 keywords
+        
+        # Add focus area keywords
+        for focus_area in focus_areas:
+            if focus_area in self.focus_areas:
+                query_terms.extend(self.focus_areas[focus_area]['keywords'][:3])  # Top 3 keywords
+        
+        return ' '.join(query_terms[:10])  # Limit to avoid overly long queries
+    
+    def _calculate_taxonomy_alignment_score(self, grant: Dict[str, Any], 
+                                          tool_types: List[str], focus_areas: List[str]) -> float:
+        """Calculate how well a grant aligns with selected taxonomy"""
+        score = 0.0
+        grant_text = f"{grant.get('title', '')} {grant.get('description', '')} {grant.get('keywords', '')}".lower()
+        
+        # Tool type alignment
+        for tool_type in tool_types:
+            if tool_type in self.tool_types:
+                type_data = self.tool_types[tool_type]
+                
+                # Count keyword matches
+                for keyword in type_data['keywords']:
+                    if keyword in grant_text:
+                        score += 2.0
+                
+                # Compound term matches (higher weight)
+                for compound in type_data['compound_terms']:
+                    if compound.lower() in grant_text:
+                        score += 4.0
+        
+        # Focus area alignment
+        for focus_area in focus_areas:
+            if focus_area in self.focus_areas:
+                area_data = self.focus_areas[focus_area]
+                
+                # Count keyword matches
+                for keyword in area_data['keywords']:
+                    if keyword in grant_text:
+                        score += 2.0
+                
+                # Compound term matches (higher weight)
+                for compound in area_data['compound_terms']:
+                    if compound.lower() in grant_text:
+                        score += 4.0
+        
+        # Bonus for multiple taxonomy alignment
+        if len(tool_types) > 1 and len(focus_areas) > 1:
+            score += 3.0
+        
+        return min(score, 20.0)  # Cap the score
+    
+    def _calculate_biotools_semantic_score(self, query: str, grant: Dict[str, Any], 
+                                         tool_types: List[str], focus_areas: List[str]) -> float:
+        """Enhanced semantic scoring with biotools specificity"""
+        score = 0.0
+        grant_text = f"{grant.get('title', '')} {grant.get('description', '')} {grant.get('keywords', '')}".lower()
+        query_lower = query.lower()
+        
+        # Tool type alignment scoring
+        for tool_type in tool_types:
+            if tool_type in self.tool_types:
+                type_data = self.tool_types[tool_type]
+                
+                # Keyword matches
+                for keyword in type_data['keywords']:
+                    if keyword in grant_text:
+                        score += 3.0
+                
+                # Compound term matches (higher weight)
+                for compound in type_data['compound_terms']:
+                    if compound.lower() in grant_text:
+                        score += 5.0
+        
+        # Focus area alignment scoring
+        for focus_area in focus_areas:
+            if focus_area in self.focus_areas:
+                area_data = self.focus_areas[focus_area]
+                
+                # Keyword matches
+                for keyword in area_data['keywords']:
+                    if keyword in grant_text:
+                        score += 3.0
+                
+                # Compound term matches (higher weight)
+                for compound in area_data['compound_terms']:
+                    if compound.lower() in grant_text:
+                        score += 5.0
+        
+        # Cross-domain relevance (tool type + focus area combinations)
+        cross_domain_bonus = 0.0
+        for tool_type in tool_types:
+            for focus_area in focus_areas:
+                if self._has_cross_domain_relevance(grant_text, tool_type, focus_area):
+                    cross_domain_bonus += 2.0
+        
+        score += min(cross_domain_bonus, 10.0)  # Cap cross-domain bonus
+        
+        # Penalize non-biotools contamination
+        contamination_penalty = 0.0
+        for domain, terms in self.excluded_domains.items():
+            for term in terms:
+                if term in grant_text:
+                    contamination_penalty += 5.0
+        
+        score = max(0.0, score - contamination_penalty)
+        
+        return min(score, 25.0)  # Cap total semantic score
+    
+    def _has_cross_domain_relevance(self, text: str, tool_type: str, focus_area: str) -> bool:
+        """Check for cross-domain biotools relevance"""
+        # Define high-value combinations
+        high_value_combinations = {
+            ('instrument', 'genomics'): ['sequencer', 'PCR', 'DNA analyzer'],
+            ('instrument', 'single_cell'): ['flow cytometer', 'cell sorter', 'droplet'],
+            ('software', 'bioinformatics'): ['analysis pipeline', 'algorithm', 'computational'],
+            ('assay', 'proteomics'): ['mass spectrometry', 'protein assay', 'immunoassay'],
+            ('instrument', 'spatial_biology'): ['imaging', 'microscopy', 'spatial analysis']
+        }
+        
+        combination_key = (tool_type, focus_area)
+        if combination_key in high_value_combinations:
+            terms = high_value_combinations[combination_key]
+            return any(term in text for term in terms)
+        
+        return False
+    
+    def search_grants(self, query: str, limit: int = 20, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+        """Enhanced biotools-specific search with optional query text (browse mode)"""
+        if not filters:
+            filters = {}
+        
+        # Extract biotools taxonomy from filters
+        tool_types = filters.get('tool_types', [])
+        focus_areas = filters.get('focus_areas', [])
+        browse_mode = filters.get('browse_mode', False) or len(query.strip()) == 0
+        
+        # Validate biotools requirements
+        validation = self._validate_biotools_query(query, tool_types, focus_areas)
+        
+        if not validation['valid']:
+            logger.warning(f"Biotools validation failed for query '{query}': {validation['issues']}")
+            return []
+        
+        # For browse mode, create a taxonomy-based query
+        if browse_mode:
+            expanded_query = self._create_taxonomy_query(tool_types, focus_areas)
+            logger.info(f"Browse mode: searching taxonomy categories {tool_types} + {focus_areas}")
+        else:
+            # Expand query with biotools context for text searches
+            expanded_query = self._expand_biotools_query(query, tool_types, focus_areas)
+            logger.info(f"Expanded biotools query: '{query}' -> '{expanded_query}'")
+        
+        # Get data type filter
+        data_type = filters.get('data_type', 'all')
+        
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute("SELECT * FROM grants")
+            all_grants = cursor.fetchall()
+            
+            if not all_grants:
+                return []
+            
+            scored_grants = []
+            
+            for row in all_grants:
+                grant = dict(row)
+                
+                # Apply data type filter early
+                if data_type != 'all':
+                    if data_type == 'awards' and self._determine_data_type(grant) != 'award':
+                        continue
+                    elif data_type == 'solicitations' and self._determine_data_type(grant) != 'solicitation':
+                        continue
+                    elif data_type == 'companies' and not grant.get('company_name'):
+                        continue
+                
+                combined_text = f"{grant.get('title', '')} {grant.get('description', '')} {grant.get('keywords', '')}"
+                
+                # Pre-filter: Must contain biotools-relevant terms
+                if not self._has_biotools_relevance(combined_text, tool_types, focus_areas):
+                    continue
+                
+                # Calculate scores with different strategy for browse vs search mode
+                if browse_mode:
+                    # For browse mode, focus on taxonomy alignment
+                    tf_idf_score = 0.0  # No text to score
+                    semantic_score = self._calculate_taxonomy_alignment_score(grant, tool_types, focus_areas)
+                    keyword_score = self._calculate_biotools_keyword_score(expanded_query, grant, tool_types, focus_areas)
+                    freshness_score = self._calculate_freshness_score(grant)
+                    
+                    # Browse mode weighting (emphasize taxonomy alignment)
+                    final_score = (
+                        semantic_score * 0.60 +  # Higher weight for taxonomy alignment
+                        keyword_score * 0.30 +
+                        freshness_score * 0.10
+                    )
+                else:
+                    # For text search mode, use full scoring
+                    query_terms = self._extract_biotools_terms(expanded_query.lower())
+                    
+                    tf_idf_score = self._calculate_tf_idf_score(query_terms, combined_text)
+                    semantic_score = self._calculate_biotools_semantic_score(expanded_query, grant, tool_types, focus_areas)
+                    keyword_score = self._calculate_biotools_keyword_score(expanded_query, grant, tool_types, focus_areas)
+                    freshness_score = self._calculate_freshness_score(grant)
+                    
+                    # Text search weighting
+                    final_score = (
+                        tf_idf_score * 0.20 +
+                        semantic_score * 0.45 +
+                        keyword_score * 0.30 +
+                        freshness_score * 0.05
+                    )
+                
+                # Adjust threshold for browse vs search mode
+                score_threshold = 2.0 if browse_mode else 3.0
+                
+                if final_score > score_threshold:
+                    grant['relevance_score'] = round(final_score, 2)
+                    grant['biotools_validation_score'] = validation['score']
+                    grant['inferred_type'] = self._determine_data_type(grant)
+                    grant['search_mode'] = 'browse' if browse_mode else 'search'
+                    scored_grants.append(grant)
+            
+            # Apply additional filters
+            if filters:
+                scored_grants = self._apply_filters(scored_grants, filters)
+            
+            # Sort by relevance and biotools specificity
+            scored_grants.sort(key=lambda x: (x['relevance_score'], x.get('biotools_validation_score', 0)), reverse=True)
+            
+            mode_text = "browse" if browse_mode else "search"
+            logger.info(f"Biotools {mode_text} returned {len(scored_grants)} validated results")
+            return scored_grants[:limit]
+            
+        except Exception as e:
+            logger.error(f"Biotools search error for '{query}': {e}")
+            return []

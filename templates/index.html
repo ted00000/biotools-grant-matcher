@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BioTools Grant Matcher Pro - Enhanced</title>
+    <title>BioTools Grant Matcher</title>
     <style>
         * {
             margin: 0;
@@ -136,12 +136,54 @@
             border: 1px solid #dee2e6;
         }
 
-        .taxonomy-section h4 {
-            color: #343a40;
+        .taxonomy-header-with-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 12px;
+        }
+
+        .taxonomy-header-with-controls h4 {
+            color: #343a40;
             font-size: 0.95rem;
             display: flex;
             align-items: center;
+            margin: 0;
+        }
+
+        .selection-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .control-btn {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            color: #495057;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .control-btn:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .control-btn:active {
+            background: #dee2e6;
+        }
+
+        .search-label-container {
+            margin-bottom: 15px;
+        }
+
+        .search-label-container h4 {
+            color: #495057;
+            font-size: 1rem;
+            font-weight: 600;
         }
 
         .taxonomy-section .section-icon {
@@ -504,7 +546,13 @@
                 <div class="taxonomy-grid">
                     <!-- Tool Types -->
                     <div class="taxonomy-section">
-                        <h4><span class="section-icon">🛠️</span>Tool Types</h4>
+                        <div class="taxonomy-header-with-controls">
+                            <h4><span class="section-icon">🛠️</span>Tool Types</h4>
+                            <div class="selection-controls">
+                                <button type="button" class="control-btn" onclick="selectAllToolTypes()">Select All</button>
+                                <button type="button" class="control-btn" onclick="selectNoneToolTypes()">Select None</button>
+                            </div>
+                        </div>
                         <div class="taxonomy-tags" id="tool-types">
                             <span class="taxonomy-tag" data-value="instrument">Instrument</span>
                             <span class="taxonomy-tag" data-value="assay">Assay</span>
@@ -518,7 +566,13 @@
 
                     <!-- Focus Areas -->
                     <div class="taxonomy-section">
-                        <h4><span class="section-icon">🎯</span>Focus Areas</h4>
+                        <div class="taxonomy-header-with-controls">
+                            <h4><span class="section-icon">🎯</span>Focus Areas</h4>
+                            <div class="selection-controls">
+                                <button type="button" class="control-btn" onclick="selectAllFocusAreas()">Select All</button>
+                                <button type="button" class="control-btn" onclick="selectNoneFocusAreas()">Select None</button>
+                            </div>
+                        </div>
                         <div class="taxonomy-tags" id="focus-areas">
                             <span class="taxonomy-tag" data-value="genomics">Genomics</span>
                             <span class="taxonomy-tag" data-value="cell_biology">Cell Biology</span>
@@ -538,22 +592,28 @@
                 </div>
             </div>
 
-            <!-- Smart Search Input -->
+            <!-- Enhanced Smart Search Input -->
             <div class="smart-search-container">
+                <div class="search-label-container">
+                    <h4 style="margin-bottom: 8px; color: #495057;">Optional Additional Descriptors</h4>
+                    <p style="font-size: 0.9rem; color: #6c757d; margin-bottom: 12px;">
+                        Add specific terms to refine your search, or leave blank to browse all grants in your selected categories
+                    </p>
+                </div>
                 <div class="search-input-container">
                     <span class="search-icon">🔍</span>
                     <input 
                         type="text" 
                         class="search-input" 
                         id="search-input"
-                        placeholder="Describe your specific biotools need (e.g., 'CRISPR screening platform', 'single cell RNA sequencing')..."
+                        placeholder="Optional: Add specific terms like 'CRISPR screening', 'high-throughput', 'machine learning'..."
                     >
                     <div class="search-suggestions" id="search-suggestions"></div>
                 </div>
                 
                 <div class="context-validation" id="context-validation">
                     <span class="validation-icon">✓</span>
-                    <span class="validation-text">Search includes biotools context</span>
+                    <span class="validation-text">Ready to search selected categories</span>
                 </div>
             </div>
 
@@ -760,24 +820,31 @@
             const validation = document.getElementById('context-validation');
             const query = searchInput.value.toLowerCase();
 
-            // Check if query contains biotools-relevant terms
-            const biotoolsTerms = [
-                'sequencing', 'assay', 'platform', 'microscopy', 'analysis', 'screening',
-                'cell', 'protein', 'dna', 'rna', 'genomic', 'proteomic', 'bioinformatics',
-                'crispr', 'pcr', 'fluorescence', 'imaging', 'cytometry', 'spectrometry'
-            ];
+            const hasSelections = selectedToolTypes.size > 0 && selectedFocusAreas.size > 0;
 
-            const hasBiotoolsContext = biotoolsTerms.some(term => query.includes(term)) || 
-                                    selectedToolTypes.size > 0 || selectedFocusAreas.size > 0;
-
-            if (query.length === 0) {
-                validation.style.display = 'none';
-            } else if (hasBiotoolsContext) {
-                validation.className = 'context-validation valid';
-                validation.innerHTML = '<span class="validation-icon">✓</span><span class="validation-text">Search includes biotools context</span>';
-            } else {
+            if (!hasSelections) {
                 validation.className = 'context-validation warning';
-                validation.innerHTML = '<span class="validation-icon">⚠️</span><span class="validation-text">Consider adding biotools-specific terms or selecting taxonomy categories</span>';
+                validation.innerHTML = '<span class="validation-icon">⚠️</span><span class="validation-text">Select at least one Tool Type and Focus Area to enable search</span>';
+            } else if (query.length === 0) {
+                validation.className = 'context-validation valid';
+                validation.innerHTML = '<span class="validation-icon">✓</span><span class="validation-text">Ready to browse selected categories</span>';
+            } else {
+                // Check if query contains biotools-relevant terms
+                const biotoolsTerms = [
+                    'sequencing', 'assay', 'platform', 'microscopy', 'analysis', 'screening',
+                    'cell', 'protein', 'dna', 'rna', 'genomic', 'proteomic', 'bioinformatics',
+                    'crispr', 'pcr', 'fluorescence', 'imaging', 'cytometry', 'spectrometry'
+                ];
+
+                const hasBiotoolsContext = biotoolsTerms.some(term => query.includes(term));
+
+                if (hasBiotoolsContext) {
+                    validation.className = 'context-validation valid';
+                    validation.innerHTML = '<span class="validation-icon">✓</span><span class="validation-text">Search includes biotools context</span>';
+                } else {
+                    validation.className = 'context-validation valid';
+                    validation.innerHTML = '<span class="validation-icon">✓</span><span class="validation-text">Will search selected categories with descriptors</span>';
+                }
             }
         }
 
@@ -786,19 +853,66 @@
             const validationMessages = document.getElementById('validation-messages');
             
             const hasMinimumSelection = selectedToolTypes.size > 0 && selectedFocusAreas.size > 0;
-            const hasSearchText = document.getElementById('search-input').value.trim().length > 0;
+            const searchText = document.getElementById('search-input').value.trim();
             
-            if (hasMinimumSelection && hasSearchText) {
+            // Search is enabled if we have taxonomy selection (text is optional)
+            if (hasMinimumSelection) {
                 searchBtn.disabled = false;
                 validationMessages.classList.remove('show');
+                
+                // Update button text based on whether we have descriptors
+                if (searchText) {
+                    searchBtn.textContent = '🔍 Search with Descriptors';
+                } else {
+                    searchBtn.textContent = '🔍 Browse Category';
+                }
             } else {
                 searchBtn.disabled = true;
-                if (hasSearchText && !hasMinimumSelection) {
+                searchBtn.textContent = '🔍 Select Categories First';
+                if (selectedToolTypes.size === 0 || selectedFocusAreas.size === 0) {
                     validationMessages.classList.add('show');
-                } else {
-                    validationMessages.classList.remove('show');
                 }
             }
+        }
+
+        function selectAllToolTypes() {
+            document.querySelectorAll('#tool-types .taxonomy-tag').forEach(tag => {
+                if (!selectedToolTypes.has(tag.dataset.value)) {
+                    selectedToolTypes.add(tag.dataset.value);
+                    tag.classList.add('selected');
+                }
+            });
+            updateSearchButton();
+            updateContextValidation();
+        }
+
+        function selectNoneToolTypes() {
+            selectedToolTypes.clear();
+            document.querySelectorAll('#tool-types .taxonomy-tag').forEach(tag => {
+                tag.classList.remove('selected');
+            });
+            updateSearchButton();
+            updateContextValidation();
+        }
+
+        function selectAllFocusAreas() {
+            document.querySelectorAll('#focus-areas .taxonomy-tag').forEach(tag => {
+                if (!selectedFocusAreas.has(tag.dataset.value)) {
+                    selectedFocusAreas.add(tag.dataset.value);
+                    tag.classList.add('selected');
+                }
+            });
+            updateSearchButton();
+            updateContextValidation();
+        }
+
+        function selectNoneFocusAreas() {
+            selectedFocusAreas.clear();
+            document.querySelectorAll('#focus-areas .taxonomy-tag').forEach(tag => {
+                tag.classList.remove('selected');
+            });
+            updateSearchButton();
+            updateContextValidation();
         }
 
         function loadExample(exampleText) {
@@ -854,7 +968,7 @@
             }
         }
 
-        // Handle form submission
+        // Handle form submission (updated for optional text)
         document.getElementById('search-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -862,12 +976,13 @@
             const toolTypes = Array.from(selectedToolTypes);
             const focusAreas = Array.from(selectedFocusAreas);
             
-            if (!query || toolTypes.length === 0 || focusAreas.length === 0) {
+            // Only require taxonomy selection, text is optional
+            if (toolTypes.length === 0 || focusAreas.length === 0) {
                 return;
             }
 
-            // Construct biotools-contextualized search
-            const biotoolsQuery = constructBiotoolsQuery(query, toolTypes, focusAreas);
+            // Construct search query (empty string is fine for browse mode)
+            const searchQuery = query || '';
             
             // Get additional filters
             const filters = {
@@ -877,7 +992,8 @@
                 deadline: document.getElementById('deadline-filter').value,
                 tool_types: toolTypes,
                 focus_areas: focusAreas,
-                biotools_validated: true
+                biotools_validated: true,
+                browse_mode: query.length === 0  // Flag for backend to know this is browse mode
             };
 
             try {
@@ -887,7 +1003,7 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        query: biotoolsQuery,
+                        query: searchQuery,
                         limit: 50,
                         filters: filters
                     })
@@ -896,7 +1012,7 @@
                 const data = await response.json();
                 
                 if (response.ok) {
-                    displayResults(data.results, biotoolsQuery, currentDataType);
+                    displayResults(data.results, searchQuery || `${toolTypes.join(', ')} • ${focusAreas.join(', ')}`, currentDataType);
                 } else {
                     showError(data.error || 'Search failed');
                 }
