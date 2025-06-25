@@ -553,7 +553,7 @@ class CompleteBiotoolsScraper:
                 amount = 0
                 if award.get('award_amount'):
                     try:
-                        amount_str = str(award['award_amount']).replace(',', '').replace('#!/usr/bin/env python3
+                        amount_str = str(award['award_amount']).replace(',', '').replace('$', '')
 """
 Complete Enhanced BioTools SBIR/STTR Scraper - Fixed Version
 Key improvements over previous version:
