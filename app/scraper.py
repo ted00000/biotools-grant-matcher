@@ -215,8 +215,13 @@ class CompleteBiotoolsScraper:
         self.logger.info("Database initialized with comprehensive schema")
 
     def calculate_biotools_relevance(self, title: str, abstract: str = "", program: str = "") -> tuple:
-        """Calculate comprehensive biotools relevance with confidence scoring"""
+        """Calculate comprehensive biotools relevance with confidence scoring - FIXED"""
         text = f"{title} {abstract} {program}".lower()
+        
+        # Exclude space/aerospace terms immediately
+        space_terms = ['space', 'satellite', 'orbital', 'spacecraft', 'space station', 'astronaut', 'rocket', 'launch']
+        if any(term in text for term in space_terms):
+            return (0.0, 0.0, [], [], [])
         
         relevance_score = 0.0
         confidence_score = 0.0
@@ -224,14 +229,29 @@ class CompleteBiotoolsScraper:
         matched_keywords = []
         compound_matches = []
         
-        # 1. Check compound keywords first (highest confidence)
-        for compound in self.compound_keywords:
+        # 1. Check compound keywords first (highest confidence) - must be biological
+        biological_compounds = [
+            'DNA sequencing', 'RNA sequencing', 'protein analysis', 'cell culture',
+            'gene editing', 'CRISPR', 'flow cytometry', 'mass spectrometry',
+            'single-cell analysis', 'tissue engineering', 'biomarker detection'
+        ]
+        for compound in biological_compounds:
             if compound.lower() in text:
                 compound_matches.append(compound)
-                relevance_score += 3.0  # High value for compound matches
-                confidence_score += 2.0
+                relevance_score += 4.0  # Higher value for biological compounds
+                confidence_score += 3.0
         
-        # 2. Check category-based keywords
+        # 2. Require explicit biological context for other terms
+        has_biological_context = any(bio_term in text for bio_term in [
+            'biolog', 'gene', 'dna', 'rna', 'protein', 'cell', 'tissue', 'enzyme',
+            'antibody', 'molecular', 'genomic', 'proteomic', 'biomedical', 'clinical',
+            'diagnostic', 'therapeutic', 'pharmaceutical', 'biotech', 'life science'
+        ])
+        
+        if not has_biological_context:
+            return (0.0, 0.0, [], [], [])
+        
+        # 3. Check category-based keywords (only if biological context exists)
         for category, keywords in self.biotools_keywords.items():
             category_matches = 0
             for keyword in keywords:
@@ -242,11 +262,11 @@ class CompleteBiotoolsScraper:
                     
                     # Weight by category importance
                     if category == 'instruments':
-                        relevance_score += 2.5
+                        relevance_score += 2.0
                         confidence_score += 1.5
                     elif category in ['genomics', 'cell_biology', 'proteomics']:
-                        relevance_score += 2.0
-                        confidence_score += 1.2
+                        relevance_score += 3.0  # Higher for core biotools areas
+                        confidence_score += 2.0
                     elif category in ['bioinformatics', 'lab_equipment']:
                         relevance_score += 1.5
                         confidence_score += 1.0
@@ -259,12 +279,12 @@ class CompleteBiotoolsScraper:
                 relevance_score += category_matches * 0.3
                 confidence_score += category_matches * 0.2
         
-        # 3. Bonus for multiple category matches
+        # 4. Bonus for multiple category matches
         if len(matched_categories) > 1:
             relevance_score += len(matched_categories) * 0.5
             confidence_score += len(matched_categories) * 0.3
         
-        # 4. Cap scores
+        # 5. Cap scores
         relevance_score = min(relevance_score, 10.0)
         confidence_score = min(confidence_score, 10.0)
         

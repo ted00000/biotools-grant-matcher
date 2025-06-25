@@ -945,9 +945,18 @@ class EnhancedBiotoolsMatcher:
                 if gtype in type_counts:
                     type_counts[gtype] = count
             
-            # Count companies (awards with company names)
-            cursor.execute("SELECT COUNT(*) FROM grants WHERE (company_name IS NOT NULL AND company_name != '') OR (firm IS NOT NULL AND firm != '')")
-            companies_count = cursor.fetchone()[0]
+            # Count companies (awards with company names) - handle both firm and company_name columns
+            try:
+                # Try company_name first
+                cursor.execute("SELECT COUNT(*) FROM grants WHERE company_name IS NOT NULL AND company_name != ''")
+                companies_count = cursor.fetchone()[0]
+            except sqlite3.OperationalError:
+                # Fallback to firm column if company_name doesn't exist
+                try:
+                    cursor.execute("SELECT COUNT(*) FROM grants WHERE firm IS NOT NULL AND firm != ''")
+                    companies_count = cursor.fetchone()[0]
+                except sqlite3.OperationalError:
+                    companies_count = 0
             
             stats['awards_count'] = type_counts['award']
             stats['solicitations_count'] = type_counts['solicitation'] 
@@ -983,7 +992,7 @@ class EnhancedBiotoolsMatcher:
                 cursor.execute("""
                     SELECT COUNT(*) FROM grants 
                     WHERE grant_type = 'solicitation'
-                    AND (close_date IS NULL OR close_date > date('now'))
+                    AND (end_date IS NULL OR end_date > date('now'))
                 """)
                 stats['open_solicitations'] = cursor.fetchone()[0]
             except sqlite3.OperationalError:
