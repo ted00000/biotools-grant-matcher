@@ -1395,7 +1395,7 @@
             
             card.innerHTML = `
                 <div class="result-header">
-                    <h3 class="result-title">${escapeHtml(result.title || 'Untitled')}</h3>
+                    <h3 class="result-title">${escapeHtml(result.display_title || result.title || 'Untitled')}</h3>
                     <div class="result-score ${scoreClass}">${score}</div>
                 </div>
                 
