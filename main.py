@@ -966,11 +966,8 @@ class EnhancedBiotoolsMatcher:
             cursor.execute("SELECT title, description, keywords FROM grants")
             all_grants = cursor.fetchall()
             
-            biotools_relevant_count = 0
-            for title, desc, keywords in all_grants:
-                combined_text = f"{title or ''} {desc or ''} {keywords or ''}"
-                if self._calculate_biotools_relevance(combined_text) > 3.0:
-                    biotools_relevant_count += 1
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE relevance_score >= 1.5")
+            biotools_relevant_count = cursor.fetchone()[0]
             
             stats['biotools_relevant_count'] = biotools_relevant_count
             stats['biotools_relevance_percentage'] = round((biotools_relevant_count / total_grants * 100), 1) if total_grants > 0 else 0
