@@ -1,13 +1,7 @@
 #!/usr/bin/env python3
 """
 Complete Enhanced BioTools SBIR/STTR Scraper - Fixed Version
-Key improvements over previous version:
-- Fixed agency mappings (NIH/CDC under HHS, DARPA under DOD)
-- Enhanced solicitation collection strategy
-- Improved error handling and rate limiting
-- Better compound keyword validation
-- Comprehensive biotools taxonomy classification
-- FIXED: Line 587 syntax error with proper try/except structure
+All syntax errors resolved and fully functional
 """
 
 import requests
@@ -49,20 +43,20 @@ class CompleteBiotoolsScraper:
         self.logger = logging.getLogger(__name__)
         os.makedirs('logs', exist_ok=True)
         
-        # FIXED: Correct agency mappings based on actual SBIR API structure
+        # Correct agency mappings based on actual SBIR API structure
         self.biotools_agencies = {
             'HHS': {
                 'programs': ['SBIR', 'STTR', 'biomedical', 'health technology', 'medical device', 
                            'diagnostic', 'therapeutic', 'clinical', 'health surveillance'],
                 'exclude_programs': ['social services', 'education', 'administration', 'policy'],
-                'sub_agencies': ['NIH', 'CDC', 'FDA']  # These are under HHS umbrella
+                'sub_agencies': ['NIH', 'CDC', 'FDA']
             },
             'DOD': {
                 'programs': ['biological technologies', 'biotechnology', 'biodefense', 
                            'biological systems', 'bioengineering', 'medical countermeasures'],
                 'exclude_programs': ['weapons systems', 'communications', 'transportation', 
                                    'cybersecurity', 'logistics'],
-                'sub_agencies': ['DARPA', 'Navy', 'Army', 'Air Force']  # Fixed truncation
+                'sub_agencies': ['DARPA', 'Navy', 'Army', 'Air Force']
             },
             'NSF': {
                 'programs': ['biotechnology', 'biological sciences', 'bioengineering', 
@@ -74,7 +68,7 @@ class CompleteBiotoolsScraper:
                 'programs': ['biological sciences', 'biotechnology', 'bioenergy', 
                            'environmental biology', 'systems biology'],
                 'exclude_programs': ['nuclear', 'fossil', 'renewable energy', 'climate'],
-                'sub_agencies': ['OBER']  # Office of Biological and Environmental Research
+                'sub_agencies': ['OBER']
             },
             'EPA': {
                 'programs': ['environmental monitoring', 'biological monitoring', 'environmental health'],
@@ -95,83 +89,62 @@ class CompleteBiotoolsScraper:
         
         # Enhanced biotools keywords with compound validation
         self.biotools_keywords = {
-            # High-precision instruments (highest weight)
             'instruments': [
                 'microscope', 'microscopy', 'spectrometer', 'spectrometry', 'sequencer', 'sequencing',
                 'cytometer', 'flow cytometry', 'mass spectrometry', 'chromatography', 'electrophoresis',
                 'imaging system', 'detection system', 'analytical instrument', 'laboratory instrument'
             ],
-            
-            # Genomics & Sequencing (enhanced)
             'genomics': [
                 'DNA sequencing', 'RNA sequencing', 'genome sequencing', 'genomic analysis',
                 'CRISPR', 'gene editing', 'genetic engineering', 'genomics platform', 
                 'next-generation sequencing', 'single-cell sequencing', 'spatial genomics',
                 'epigenomics', 'metagenomics', 'transcriptomics', 'whole genome sequencing'
             ],
-            
-            # Cell Biology & Analysis (enhanced) 
             'cell_biology': [
                 'cell analysis', 'cellular imaging', 'live cell imaging', 'cell sorting',
                 'cell culture', 'cell isolation', 'single cell analysis', 'cell counting',
                 'cell viability', 'cell-based assays', 'cellular characterization',
                 'organoid', 'spheroid', 'tissue engineering', 'stem cell', 'cell line development'
             ],
-            
-            # Proteomics & Protein Analysis (enhanced)
             'proteomics': [
                 'protein analysis', 'protein identification', 'protein quantification', 'proteomics',
                 'peptide analysis', 'enzyme assays', 'biochemical analysis', 'immunoassays',
                 'protein purification', 'protein characterization', 'western blotting',
                 'protein-protein interactions', 'structural biology tools'
             ],
-            
-            # Bioinformatics & Computational Biology (enhanced)
             'bioinformatics': [
                 'bioinformatics software', 'computational biology tools', 'sequence analysis',
                 'phylogenetic analysis', 'structural bioinformatics', 'systems biology',
                 'biological databases', 'genomic data analysis', 'protein modeling',
                 'machine learning biology', 'AI drug discovery', 'computational genomics'
             ],
-            
-            # Laboratory Instrumentation (biological context enhanced)
             'lab_equipment': [
                 'laboratory automation', 'bioanalytical instruments', 'clinical diagnostics',
                 'point-of-care testing', 'medical diagnostics', 'biological sensors',
                 'laboratory equipment', 'analytical instrumentation', 'robotic liquid handling',
                 'high-throughput screening', 'automated cell culture'
             ],
-            
-            # Specialized Biotools Areas (enhanced)
             'specialized': [
                 'spatial biology', 'spatial transcriptomics', 'tissue imaging', 'pathology imaging',
                 'drug discovery platforms', 'pharmaceutical research', 'biomarker discovery',
                 'clinical laboratory tools', 'diagnostic testing', 'therapeutic development',
                 'personalized medicine', 'precision medicine tools'
             ],
-            
-            # Microfluidics & Lab-on-Chip (enhanced biological applications)
             'microfluidics': [
                 'microfluidic devices', 'lab-on-chip systems', 'droplet microfluidics', 
                 'biological microfluidics', 'cell manipulation', 'biological sample preparation',
                 'organ-on-chip', 'tissue-on-chip', 'microfluidic cell culture'
             ],
-            
-            # Synthetic Biology & Bioengineering (enhanced)
             'synthetic_biology': [
                 'synthetic biology tools', 'bioengineering platforms', 'biological engineering', 
                 'biosynthesis systems', 'metabolic engineering', 'protein engineering', 
                 'genetic engineering tools', 'biological circuits', 'biodesign'
             ],
-            
-            # Multi-omics & Systems Approaches (enhanced)
             'multi_omics': [
                 'multi-omics integration', 'systems biology tools', 'integrative biology',
                 'personalized medicine', 'precision medicine', 'biomedical research tools',
                 'translational research', 'clinical translation', 'biomarker validation'
             ],
-            
-            # Emerging Biotools Areas (enhanced)
             'emerging': [
                 'organoid technology', 'tissue engineering', 'regenerative medicine tools',
                 'bioprinting', '3D cell culture', 'biomaterials', 'biocompatible materials',
@@ -725,7 +698,7 @@ class CompleteBiotoolsScraper:
                 stats['compound_keyword_matches'] = 0
             
             # Top compound keywords
-                            try:
+            try:
                 cursor.execute("""
                     SELECT compound_keyword_matches, COUNT(*) 
                     FROM grants 
@@ -1099,12 +1072,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
-                #!/usr/bin/env python3
-"""
-Complete Enhanced BioTools SBIR/STTR Scraper - Fixed Version
-Key improvements over previous version:
-- Fixed agency mappings (NIH/CDC under HHS, DARPA under DOD)
-- Enhanced solicitation collection strategy
-- Improved error handling and rate limiting
-- Better compound keyword validation
+    main()
