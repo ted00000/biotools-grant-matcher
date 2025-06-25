@@ -554,13 +554,6 @@ class CompleteBiotoolsScraper:
                 if award.get('award_amount'):
                     try:
                         amount_str = str(award['award_amount']).replace(',', '').replace('$', '')
-"""
-Complete Enhanced BioTools SBIR/STTR Scraper - Fixed Version
-Key improvements over previous version:
-- Fixed agency mappings (NIH/CDC under HHS, DARPA under DOD)
-- Enhanced solicitation collection strategy
-- Improved error handling and rate limiting
-- Better compound keyword validation, '')
                         amount = int(float(amount_str))
                     except (ValueError, TypeError):
                         amount = 0
