@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grant Details - BioTools Grant Matcher Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .navigation {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .nav-link {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            display: inline-block;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .grant-detail-section {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            margin-bottom: 30px;
+            animation: slideInUp 0.8s ease-out;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 60px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .grant-content {
+            display: none;
+        }
+
+        .grant-header {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #f8f9fa;
+        }
+
+        .grant-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            line-height: 1.3;
+        }
+
+        .grant-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f8f9fa;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .meta-icon {
+            font-size: 1.1rem;
+        }
+
+        .status-indicator {
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-open {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-closed {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-awarded {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status-unknown {
+            background: #e2e3e5;
+            color: #495057;
+            border: 1px solid #d6d8db;
+        }
+
+        .relevance-score {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .grant-details-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 40px;
+            margin-top: 30px;
+        }
+
+        .main-details {
+            background: #fff;
+        }
+
+        .sidebar-details {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid #dee2e6;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-icon {
+            font-size: 1.4rem;
+        }
+
+        .description-text {
+            font-size: 1rem;
+            line-height: 1.7;
+            color: #495057;
+            margin-bottom: 20px;
+        }
+
+        .detail-item {
+            margin-bottom: 15px;
+            padding: 15px;
+            border-left: 4px solid #667eea;
+            background: #f8f9fa;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-value {
+            color: #495057;
+            font-size: 1rem;
+        }
+
+        .tags-container {
+            margin-top: 20px;
+        }
+
+        .tag {
+            display: inline-block;
+            background: #e9ecef;
+            color: #495057;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            margin: 4px 8px 4px 0;
+            border: 1px solid #dee2e6;
+            font-weight: 500;
+        }
+
+        .tag.biotools {
+            background: linear-gradient(135deg, #e8f4fd 0%, #d1ecf1 100%);
+            color: #0056b3;
+            border-color: #bee5eb;
+        }
+
+        .tag.compound {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            color: #856404;
+            border-color: #ffeaa7;
+        }
+
+        .actions-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #f8f9fa;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            padding: 12px 24px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            background: white;
+            color: #495057;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .action-btn:hover {
+            background: #f8f9fa;
+            border-color: #adb5bd;
+            transform: translateY(-2px);
+        }
+
+        .action-btn.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
+        .action-btn.primary:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+            border-color: #5a6fd8;
+        }
+
+        .error-message {
+            text-align: center;
+            padding: 40px;
+            color: #dc3545;
+        }
+
+        .error-message h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        .back-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .grant-detail-section {
+                padding: 25px;
+            }
+            
+            .grant-details-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .grant-meta {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .actions-section {
+                justify-content: center;
+            }
+            
+            .action-btn {
+                flex: 1;
+                justify-content: center;
+                min-width: 120px;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes slideOutRight {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧬 Grant Details</h1>
+            <p>Detailed information about this funding opportunity</p>
+        </div>
+
+        <div class="navigation">
+            <a href="/" class="nav-link">← Back to Search</a>
+        </div>
+
+        <div class="grant-detail-section">
+            <div class="loading-spinner" id="loading-spinner">
+                <div class="spinner"></div>
+                <p>Loading grant details...</p>
+            </div>
+            
+            <div class="grant-content" id="grant-content">
+                <!-- Grant content will be populated here -->
+            </div>
+            
+            <div class="error-message" id="error-message" style="display: none;">
+                <h3>Grant Not Found</h3>
+                <p>The requested grant could not be found or may have been removed.</p>
+                <p><a href="/" class="back-link">Return to search</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get grant ID from URL
+        const pathParts = window.location.pathname.split('/');
+        const grantId = parseInt(pathParts[pathParts.length - 1]);
+
+        // Load grant details on page load
+        window.addEventListener('load', async () => {
+            if (isNaN(grantId) || grantId <= 0) {
+                showError('Invalid grant ID');
+                return;
+            }
+
+            try {
+                await loadGrantDetails(grantId);
+            } catch (error) {
+                console.error('Error loading grant details:', error);
+                showError('Failed to load grant details');
+            }
+        });
+
+        async function loadGrantDetails(grantId) {
+            try {
+                const response = await fetch(`/api/grant/${grantId}`);
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    displayGrantDetails(data.grant);
+                } else {
+                    showError(data.error || 'Grant not found');
+                }
+            } catch (error) {
+                console.error('Network error:', error);
+                showError('Network error occurred');
+            }
+        }
+
+        function displayGrantDetails(grant) {
+            document.getElementById('loading-spinner').style.display = 'none';
+            document.getElementById('grant-content').style.display = 'block';
+
+            // Update page title
+            document.title = `${grant.title || 'Grant Details'} - BioTools Grant Matcher Pro`;
+
+            const content = `
+                <div class="grant-header">
+                    <h1 class="grant-title">${escapeHtml(grant.display_title || grant.title || 'Untitled Grant')}</h1>
+                    
+                    <div class="grant-meta">
+                        <div class="meta-item">
+                            <span class="meta-icon">🏛️</span>
+                            <span>${escapeHtml(grant.agency || 'Unknown Agency')}</span>
+                        </div>
+                        
+                        ${grant.program ? `
+                            <div class="meta-item">
+                                <span class="meta-icon">📋</span>
+                                <span>${escapeHtml(grant.program)}</span>
+                            </div>
+                        ` : ''}
+                        
+                        ${grant.phase ? `
+                            <div class="meta-item">
+                                <span class="meta-icon">📊</span>
+                                <span>Phase ${escapeHtml(grant.phase)}</span>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="status-indicator status-${grant.status_class || 'unknown'}">
+                            ${escapeHtml(grant.status || 'Unknown')}
+                        </div>
+                        
+                        ${grant.biotools_relevance ? `
+                            <div class="relevance-score">
+                                🎯 ${grant.biotools_relevance.toFixed(1)}/10 BioTools Match
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    ${grant.display_subtitle ? `
+                        <p style="color: #6c757d; font-style: italic; margin-top: 10px;">
+                            ${escapeHtml(grant.display_subtitle)}
+                        </p>
+                    ` : ''}
+                </div>
+
+                <div class="grant-details-grid">
+                    <div class="main-details">
+                        ${grant.description || grant.abstract ? `
+                            <div class="section-title">
+                                <span class="section-icon">📄</span>
+                                Description
+                            </div>
+                            <div class="description-text">
+                                ${escapeHtml(grant.description || grant.abstract || 'No description available')}
+                            </div>
+                        ` : ''}
+
+                        ${(grant.biotools_categories_list && grant.biotools_categories_list.length > 0) || 
+                          (grant.compound_keywords_list && grant.compound_keywords_list.length > 0) ? `
+                            <div class="tags-container">
+                                <div class="section-title">
+                                    <span class="section-icon">🏷️</span>
+                                    BioTools Categories & Keywords
+                                </div>
+                                
+                                ${grant.biotools_categories_list && grant.biotools_categories_list.length > 0 ? 
+                                    grant.biotools_categories_list.map(cat => 
+                                        `<span class="tag biotools">${escapeHtml(cat)}</span>`
+                                    ).join('') : ''
+                                }
+                                
+                                ${grant.compound_keywords_list && grant.compound_keywords_list.length > 0 ? 
+                                    grant.compound_keywords_list.map(keyword => 
+                                        `<span class="tag compound">${escapeHtml(keyword)}</span>`
+                                    ).join('') : ''
+                                }
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="sidebar-details">
+                        <div class="section-title">
+                            <span class="section-icon">ℹ️</span>
+                            Grant Information
+                        </div>
+
+                        ${grant.display_company ? `
+                            <div class="detail-item">
+                                <div class="detail-label">Company/Organization</div>
+                                <div class="detail-value">${escapeHtml(grant.display_company)}</div>
+                            </div>
+                        ` : ''}
+
+                        ${grant.principal_investigator ? `
+                            <div class="detail-item">
+                                <div class="detail-label">Principal Investigator</div>
+                                <div class="detail-value">${escapeHtml(grant.principal_investigator)}</div>
+                            </div>
+                        ` : ''}
+
+                        ${grant.formatted_amount && grant.formatted_amount !== 'N/A' ? `
+                            <div class="detail-item">
+                                <div class="detail-label">Award Amount</div>
+                                <div class="detail-value">${escapeHtml(grant.formatted_amount)}</div>
+                            </div>
+                        ` : ''}
+
+                        ${grant.award_number ? `
+                            <div class="detail-item">
+                                <div class="detail-label">Award Number</div>
+                                <div class="detail-value">${escapeHtml(grant.award_number)}</div>
+                            </div>
+                        ` : ''}
+
+                        ${grant.formatted_award_date && grant.formatted_award_date !== 'N/A' ? `
+                            <div class="detail-item">
+                                <div class="detail-label">Award Date</div>
+                                <div class="detail-value">${escapeHtml(grant.formatted_award_date)}</div>
+                            </div>
+                        ` : ''}
+
+                        ${grant.formatted_end_date && grant.formatted_end_date !== 'N/A' ? `
+                            <div class="detail-item">
+                                <div class="detail-label">End Date</div>
+                                <div class="detail-value">${escapeHtml(grant.formatted_end_date)}</div>
+                            </div>
+                        ` : ''}
+
+                        ${grant.formatted_close_date && grant.formatted_close_date !== 'N/A' ? `
+                            <div class="detail-item">
+                                <div class="detail-label">Application Deadline</div>
+                                <div class="detail-value">${escapeHtml(grant.formatted_close_date)}</div>
+                            </div>
+                        ` : ''}
+
+                        ${grant.days_remaining && grant.days_remaining > 0 ? `
+                            <div class="detail-item" style="border-left-color: #28a745;">
+                                <div class="detail-label">Days Remaining</div>
+                                <div class="detail-value" style="color: #28a745; font-weight: 600;">
+                                    ${grant.days_remaining} days left to apply!
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${grant.inferred_type ? `
+                            <div class="detail-item">
+                                <div class="detail-label">Grant Type</div>
+                                <div class="detail-value">${escapeHtml(grant.inferred_type.charAt(0).toUpperCase() + grant.inferred_type.slice(1))}</div>
+                            </div>
+                        ` : ''}
+
+                        ${grant.keywords ? `
+                            <div class="detail-item">
+                                <div class="detail-label">Keywords</div>
+                                <div class="detail-value">${escapeHtml(grant.keywords)}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <div class="actions-section">
+                    <button class="action-btn" onclick="bookmarkGrant(${grant.id})">
+                        <span>🔖</span>
+                        Bookmark
+                    </button>
+                    
+                    <button class="action-btn" onclick="shareGrant(${grant.id})">
+                        <span>🔗</span>
+                        Share
+                    </button>
+                    
+                    <button class="action-btn" onclick="exportGrantDetails()">
+                        <span>📄</span>
+                        Export Details
+                    </button>
+                    
+                    <button class="action-btn primary" onclick="provideFeedback(${grant.id})">
+                        <span>💬</span>
+                        Provide Feedback
+                    </button>
+                    
+                    ${grant.url ? `
+                        <a href="${escapeHtml(grant.url)}" target="_blank" class="action-btn primary">
+                            <span>🔗</span>
+                            View Original
+                        </a>
+                    ` : ''}
+                </div>
+            `;
+
+            document.getElementById('grant-content').innerHTML = content;
+        }
+
+        function showError(message) {
+            document.getElementById('loading-spinner').style.display = 'none';
+            document.getElementById('error-message').style.display = 'block';
+            
+            const errorElement = document.getElementById('error-message');
+            errorElement.innerHTML = `
+                <h3>Error Loading Grant</h3>
+                <p>${escapeHtml(message)}</p>
+                <p><a href="/" class="back-link">← Return to search</a></p>
+            `;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Action functions
+        function bookmarkGrant(grantId) {
+            // Store bookmark in localStorage
+            let bookmarks = JSON.parse(localStorage.getItem('biotoolsBookmarks') || '[]');
+            
+            if (!bookmarks.includes(grantId)) {
+                bookmarks.push(grantId);
+                localStorage.setItem('biotoolsBookmarks', JSON.stringify(bookmarks));
+                
+                // Provide feedback to user
+                showNotification('Grant bookmarked successfully!', 'success');
+                
+                // Send feedback to server
+                submitFeedback(grantId, 'bookmarked');
+            } else {
+                showNotification('Grant is already bookmarked', 'info');
+            }
+        }
+
+        function shareGrant(grantId) {
+            const url = `${window.location.origin}/grant/${grantId}`;
+            const title = document.querySelector('.grant-title')?.textContent || 'BioTools Grant';
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: title,
+                    text: 'Check out this BioTools grant opportunity',
+                    url: url
+                }).catch(console.error);
+            } else {
+                // Fallback to clipboard
+                navigator.clipboard.writeText(url).then(() => {
+                    showNotification('Grant link copied to clipboard!', 'success');
+                }).catch(() => {
+                    // Ultimate fallback - show URL in a prompt
+                    prompt('Copy this URL to share:', url);
+                });
+            }
+        }
+
+        function exportGrantDetails() {
+            const grantTitle = document.querySelector('.grant-title')?.textContent || 'Grant Details';
+            const grantContent = document.getElementById('grant-content');
+            
+            // Create a simplified text version for export
+            const exportText = createExportText();
+            
+            // Create and download file
+            const blob = new Blob([exportText], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${grantTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_details.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            showNotification('Grant details exported successfully!', 'success');
+        }
+
+        function createExportText() {
+            const title = document.querySelector('.grant-title')?.textContent || 'Grant Details';
+            const description = document.querySelector('.description-text')?.textContent || 'No description available';
+            
+            // Extract key details
+            const details = [];
+            document.querySelectorAll('.detail-item').forEach(item => {
+                const label = item.querySelector('.detail-label')?.textContent;
+                const value = item.querySelector('.detail-value')?.textContent;
+                if (label && value) {
+                    details.push(`${label}: ${value}`);
+                }
+            });
+            
+            return `
+BIOTOOLS GRANT DETAILS
+======================
+
+Title: ${title}
+
+Description:
+${description}
+
+Grant Information:
+${details.join('\n')}
+
+Exported from BioTools Grant Matcher Pro
+${new Date().toLocaleString()}
+            `.trim();
+        }
+
+        function provideFeedback(grantId) {
+            const feedback = prompt(
+                'How would you rate this grant match?\n\n' +
+                'Type one of: helpful, not_helpful, applied, or provide custom feedback:'
+            );
+            
+            if (feedback && feedback.trim()) {
+                const feedbackType = ['helpful', 'not_helpful', 'applied'].includes(feedback.toLowerCase()) 
+                    ? feedback.toLowerCase() 
+                    : 'helpful';
+                
+                submitFeedback(grantId, feedbackType, feedback);
+                showNotification('Thank you for your feedback!', 'success');
+            }
+        }
+
+        async function submitFeedback(grantId, feedbackType, notes = '') {
+            try {
+                await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        grant_id: grantId,
+                        feedback_type: feedbackType,
+                        search_query: document.referrer || '',
+                        notes: notes
+                    })
+                });
+            } catch (error) {
+                console.error('Error submitting feedback:', error);
+            }
+        }
+
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 1000;
+                animation: slideInRight 0.3s ease-out;
+                max-width: 300px;
+                word-wrap: break-word;
+            `;
+            
+            // Set background color based on type
+            switch (type) {
+                case 'success':
+                    notification.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+                    break;
+                case 'error':
+                    notification.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
+                    break;
+                case 'warning':
+                    notification.style.background = 'linear-gradient(135deg, #ffc107 0%, #e0a800 100%)';
+                    notification.style.color = '#212529';
+                    break;
+                default:
+                    notification.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            }
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // Remove notification after 4 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOutRight 0.3s ease-out';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 4000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Escape to go back
+            if (e.key === 'Escape') {
+                window.history.back();
+            }
+            
+            // B to bookmark
+            if (e.key === 'b' || e.key === 'B') {
+                if (!e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    const grantId = parseInt(window.location.pathname.split('/').pop());
+                    if (grantId) bookmarkGrant(grantId);
+                }
+            }
+            
+            // S to share
+            if (e.key === 's' || e.key === 'S') {
+                if (!e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    const grantId = parseInt(window.location.pathname.split('/').pop());
+                    if (grantId) shareGrant(grantId);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
