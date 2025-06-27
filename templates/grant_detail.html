@@ -204,6 +204,125 @@
             border: 1px solid #f5c6cb;
         }
 
+        /* TABA Information Styles */
+        .taba-info-section {
+            background: linear-gradient(135deg, #f8fff9 0%, #e8f5e8 100%);
+            border: 2px solid #28a745;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .taba-status-display {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            border-left: 6px solid #28a745;
+        }
+
+        .taba-status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .taba-status-badge.explicit {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            animation: pulse 2s infinite;
+        }
+
+        .taba-status-badge.likely {
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            color: white;
+        }
+
+        .taba-status-badge.commercialization {
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+            color: #212529;
+        }
+
+        .taba-status-badge.eligible {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+        }
+
+        .taba-status-badge.not-eligible {
+            background: #f8f9fa;
+            color: #6c757d;
+            border: 2px solid #dee2e6;
+        }
+
+        .taba-amount-display {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #28a745;
+        }
+
+        .taba-confidence-display {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        .taba-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .taba-detail-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+        }
+
+        .taba-detail-label {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .taba-detail-value {
+            color: #495057;
+            font-size: 1rem;
+        }
+
+        .taba-keywords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .taba-keyword {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            color: #155724;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            border: 1px solid #28a745;
+            font-weight: 500;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
         .grant-details-grid {
             display: grid;
             grid-template-columns: 2fr 1fr;
@@ -241,7 +360,7 @@
             line-height: 1.7;
             color: #495057;
             margin-bottom: 20px;
-            white-space: pre-wrap; /* Preserve formatting and line breaks */
+            white-space: pre-wrap;
         }
 
         .detail-item {
@@ -459,6 +578,10 @@
                 justify-content: center;
                 min-width: 120px;
             }
+
+            .taba-details {
+                grid-template-columns: 1fr;
+            }
         }
 
         /* Animations */
@@ -511,7 +634,7 @@
     <div class="container">
         <div class="header">
             <h1>🧬 Grant Details</h1>
-            <p>Comprehensive funding information with contact details</p>
+            <p>Comprehensive funding information with contact details and TABA tracking</p>
         </div>
 
         <div class="navigation">
@@ -541,6 +664,9 @@
         const pathParts = window.location.pathname.split('/');
         const grantId = parseInt(pathParts[pathParts.length - 1]);
 
+        // Store grant data globally for exports
+        let currentGrant = null;
+
         // Load grant details on page load
         window.addEventListener('load', async () => {
             if (isNaN(grantId) || grantId <= 0) {
@@ -562,6 +688,7 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
+                    currentGrant = data.grant; // Store globally for exports
                     displayGrantDetails(data.grant);
                 } else {
                     showError(data.error || 'Grant not found');
@@ -626,6 +753,9 @@
                         </p>
                     ` : ''}
                 </div>
+
+                <!-- TABA Information Section -->
+                ${displayTabaInformation(grant)}
 
                 <div class="grant-details-grid">
                     <div class="main-details">
@@ -915,6 +1045,13 @@
                         </button>
                     ` : ''}
                     
+                    ${grant.has_taba_funding || grant.taba_eligible ? `
+                        <button class="action-btn" onclick="exportTabaInfo()" style="background: #28a745; color: white;">
+                            <span>💰</span>
+                            Export TABA Info
+                        </button>
+                    ` : ''}
+                    
                     <button class="action-btn primary" onclick="provideFeedback(${grant.id})">
                         <span>💬</span>
                         Provide Feedback
@@ -930,6 +1067,109 @@
             `;
 
             document.getElementById('grant-content').innerHTML = content;
+        }
+
+        function displayTabaInformation(grant) {
+            // Check if grant has TABA information
+            if (grant.has_taba_funding || grant.taba_eligible) {
+                const statusIcon = grant.taba_status_icon || '💰';
+                const statusText = grant.taba_status_text || 'TABA Information';
+                const statusClass = grant.taba_status_class || 'unknown';
+                
+                let amountDisplay = '';
+                if (grant.taba_amount && grant.taba_amount > 0) {
+                    amountDisplay = `<div class="taba-amount-display">${grant.taba_amount.toLocaleString()}</div>`;
+                }
+                
+                let confidenceDisplay = '';
+                if (grant.taba_confidence_score && grant.taba_confidence_score > 0) {
+                    confidenceDisplay = `<div class="taba-confidence-display">Confidence: ${grant.taba_confidence_score.toFixed(1)}/10</div>`;
+                }
+                
+                let detailsHtml = '';
+                
+                if (grant.taba_type && grant.taba_type !== 'none') {
+                    detailsHtml += `
+                        <div class="taba-detail-item">
+                            <div class="taba-detail-label">TABA Type</div>
+                            <div class="taba-detail-value">${grant.taba_type.charAt(0).toUpperCase() + grant.taba_type.slice(1)}</div>
+                        </div>
+                    `;
+                }
+                
+                if (grant.formatted_taba_amount && grant.formatted_taba_amount !== 'N/A') {
+                    detailsHtml += `
+                        <div class="taba-detail-item">
+                            <div class="taba-detail-label">TABA Amount</div>
+                            <div class="taba-detail-value">${grant.formatted_taba_amount}</div>
+                        </div>
+                    `;
+                }
+                
+                if (grant.taba_confidence_score && grant.taba_confidence_score > 0) {
+                    detailsHtml += `
+                        <div class="taba-detail-item">
+                            <div class="taba-detail-label">Detection Confidence</div>
+                            <div class="taba-detail-value">${grant.taba_confidence_score.toFixed(1)}/10</div>
+                        </div>
+                    `;
+                }
+                
+                if (grant.taba_keywords_list && grant.taba_keywords_list.length > 0) {
+                    const keywordsHtml = grant.taba_keywords_list.map(keyword =>
+                        `<span class="taba-keyword">${escapeHtml(keyword)}</span>`
+                    ).join('');
+                    
+                    detailsHtml += `
+                        <div class="taba-detail-item" style="grid-column: 1 / -1;">
+                            <div class="taba-detail-label">TABA Keywords Found</div>
+                            <div class="taba-keywords">${keywordsHtml}</div>
+                        </div>
+                    `;
+                }
+                
+                // Add TABA benefits information
+                if (grant.has_taba_funding || grant.taba_eligible) {
+                    detailsHtml += `
+                        <div class="taba-detail-item" style="grid-column: 1 / -1;">
+                            <div class="taba-detail-label">TABA Can Be Used For</div>
+                            <div class="taba-detail-value">
+                                • Technical assistance and problem solving<br>
+                                • Market research and customer discovery<br>
+                                • Intellectual property protection<br>
+                                • Business planning and commercialization<br>
+                                • Manufacturing and scale-up planning<br>
+                                • Regulatory strategy development
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                return `
+                    <div class="taba-info-section">
+                        <div class="section-title">
+                            <span class="section-icon">💰</span>
+                            TABA Funding Information
+                        </div>
+                        
+                        <div class="taba-status-display">
+                            <div class="taba-status-badge ${statusClass}">
+                                <span style="font-size: 1.2rem;">${statusIcon}</span>
+                                <span>${statusText}</span>
+                            </div>
+                            <div style="flex: 1;">
+                                ${amountDisplay}
+                                ${confidenceDisplay}
+                            </div>
+                        </div>
+                        
+                        <div class="taba-details">
+                            ${detailsHtml}
+                        </div>
+                    </div>
+                `;
+            }
+            return '';
         }
 
         function showError(message) {
@@ -953,6 +1193,11 @@
 
         // Enhanced action functions
         function exportContactInfo() {
+            if (!currentGrant || !currentGrant.has_any_contact) {
+                showNotification('No contact information available', 'warning');
+                return;
+            }
+            
             const contactData = extractContactData();
             const contactText = createContactExportText(contactData);
             
@@ -960,7 +1205,7 @@
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'grant_contacts.txt';
+            a.download = `grant_${currentGrant.id}_contacts.txt`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -970,19 +1215,37 @@
         }
 
         function extractContactData() {
-            const grantTitle = document.querySelector('.grant-title')?.textContent || 'Grant';
+            const grantTitle = currentGrant?.title || 'Grant';
             const contacts = [];
             
-            // Extract contact information from the page
-            document.querySelectorAll('.contact-item').forEach(item => {
-                const text = item.textContent.trim();
-                const link = item.querySelector('a');
-                if (link) {
-                    contacts.push(`${text} (${link.href})`);
-                } else {
-                    contacts.push(text);
-                }
-            });
+            // Extract contact information from current grant
+            if (currentGrant?.poc_name || currentGrant?.poc_email || currentGrant?.poc_phone) {
+                contacts.push('Point of Contact:');
+                if (currentGrant.poc_name) contacts.push(`  Name: ${currentGrant.poc_name}`);
+                if (currentGrant.poc_title) contacts.push(`  Title: ${currentGrant.poc_title}`);
+                if (currentGrant.poc_email) contacts.push(`  Email: ${currentGrant.poc_email}`);
+                if (currentGrant.poc_phone) contacts.push(`  Phone: ${currentGrant.poc_phone}`);
+                contacts.push('');
+            }
+            
+            if (currentGrant?.principal_investigator || currentGrant?.pi_email || currentGrant?.pi_phone) {
+                contacts.push('Principal Investigator:');
+                if (currentGrant.principal_investigator) contacts.push(`  Name: ${currentGrant.principal_investigator}`);
+                if (currentGrant.pi_email) contacts.push(`  Email: ${currentGrant.pi_email}`);
+                if (currentGrant.pi_phone) contacts.push(`  Phone: ${currentGrant.pi_phone}`);
+                contacts.push('');
+            }
+            
+            if (currentGrant?.ri_poc_name || currentGrant?.ri_poc_phone) {
+                contacts.push('Research Institution Contact:');
+                if (currentGrant.ri_poc_name) contacts.push(`  Name: ${currentGrant.ri_poc_name}`);
+                if (currentGrant.ri_poc_phone) contacts.push(`  Phone: ${currentGrant.ri_poc_phone}`);
+                contacts.push('');
+            }
+            
+            if (currentGrant?.company_url) {
+                contacts.push(`Company Website: ${currentGrant.company_url}`);
+            }
             
             return {
                 title: grantTitle,
@@ -996,9 +1259,68 @@ GRANT CONTACT INFORMATION
 ========================
 
 Grant: ${data.title}
+Grant ID: ${currentGrant?.id || 'Unknown'}
 
-Contact Details:
 ${data.contacts.join('\n')}
+
+Exported from BioTools Grant Matcher Pro
+${new Date().toLocaleString()}
+            `.trim();
+        }
+
+        function exportTabaInfo() {
+            if (!currentGrant || (!currentGrant.has_taba_funding && !currentGrant.taba_eligible)) {
+                showNotification('No TABA information available for this grant', 'warning');
+                return;
+            }
+
+            const tabaText = createTabaExportText(currentGrant);
+
+            const blob = new Blob([tabaText], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `grant_${currentGrant.id}_taba_info.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            showNotification('TABA information exported successfully!', 'success');
+        }
+
+        function createTabaExportText(grant) {
+            const title = grant.title || 'Grant';
+
+            return `
+TABA FUNDING INFORMATION
+========================
+
+Grant: ${title}
+Grant ID: ${grant.id}
+Agency: ${grant.agency || 'Unknown'}
+
+TABA Status: ${grant.taba_status_text || 'Unknown'}
+TABA Type: ${grant.taba_type || 'None'}
+TABA Amount: ${grant.formatted_taba_amount || 'N/A'}
+Detection Confidence: ${grant.taba_confidence_score ? grant.taba_confidence_score.toFixed(1) + '/10' : 'N/A'}
+
+TABA Keywords Found:
+${grant.taba_keywords_list ? grant.taba_keywords_list.join(', ') : 'None'}
+
+TABA BENEFITS:
+• Technical assistance and problem solving
+• Market research and customer discovery
+• Intellectual property protection
+• Business planning and commercialization
+• Manufacturing and scale-up planning
+• Regulatory strategy development
+
+TABA FUNDING LIMITS:
+• Phase I: Up to $6,500
+• Phase II: Up to $50,000
+
+${grant.taba_status_description || ''}
 
 Exported from BioTools Grant Matcher Pro
 ${new Date().toLocaleString()}
@@ -1020,7 +1342,7 @@ ${new Date().toLocaleString()}
 
         function shareGrant(grantId) {
             const url = `${window.location.origin}/grant/${grantId}`;
-            const title = document.querySelector('.grant-title')?.textContent || 'BioTools Grant';
+            const title = currentGrant?.title || 'BioTools Grant';
             
             if (navigator.share) {
                 navigator.share({
@@ -1038,7 +1360,12 @@ ${new Date().toLocaleString()}
         }
 
         function exportGrantDetails() {
-            const grantTitle = document.querySelector('.grant-title')?.textContent || 'Grant Details';
+            if (!currentGrant) {
+                showNotification('No grant data available', 'error');
+                return;
+            }
+            
+            const grantTitle = currentGrant.title || 'Grant Details';
             const exportText = createExportText();
             
             const blob = new Blob([exportText], { type: 'text/plain' });
@@ -1055,28 +1382,37 @@ ${new Date().toLocaleString()}
         }
 
         function createExportText() {
-            const title = document.querySelector('.grant-title')?.textContent || 'Grant Details';
-            const description = document.querySelector('.description-text')?.textContent || 'No description available';
+            const title = currentGrant?.title || 'Grant Details';
+            const description = currentGrant?.description || currentGrant?.abstract || 'No description available';
             
             const details = [];
-            document.querySelectorAll('.detail-item').forEach(item => {
-                const label = item.querySelector('.detail-label')?.textContent;
-                const value = item.querySelector('.detail-value')?.textContent;
-                if (label && value) {
-                    details.push(`${label}: ${value}`);
-                }
-            });
+            if (currentGrant?.formatted_amount && currentGrant.formatted_amount !== 'N/A') {
+                details.push(`Award Amount: ${currentGrant.formatted_amount}`);
+            }
+            if (currentGrant?.award_number) {
+                details.push(`Award Number: ${currentGrant.award_number}`);
+            }
+            if (currentGrant?.formatted_award_date && currentGrant.formatted_award_date !== 'N/A') {
+                details.push(`Award Date: ${currentGrant.formatted_award_date}`);
+            }
+            if (currentGrant?.principal_investigator) {
+                details.push(`Principal Investigator: ${currentGrant.principal_investigator}`);
+            }
 
             const contacts = [];
-            document.querySelectorAll('.contact-item').forEach(item => {
-                contacts.push(item.textContent.trim());
-            });
+            if (currentGrant?.poc_name || currentGrant?.poc_email || currentGrant?.poc_phone) {
+                if (currentGrant.poc_name) contacts.push(`POC: ${currentGrant.poc_name}`);
+                if (currentGrant.poc_email) contacts.push(`POC Email: ${currentGrant.poc_email}`);
+                if (currentGrant.poc_phone) contacts.push(`POC Phone: ${currentGrant.poc_phone}`);
+            }
             
             return `
 BIOTOOLS GRANT DETAILS
 ======================
 
 Title: ${title}
+Grant ID: ${currentGrant?.id || 'Unknown'}
+Agency: ${currentGrant?.agency || 'Unknown'}
 
 Description:
 ${description}
@@ -1086,6 +1422,13 @@ ${details.join('\n')}
 
 Contact Information:
 ${contacts.join('\n')}
+
+${currentGrant?.has_taba_funding || currentGrant?.taba_eligible ? `
+TABA Information:
+Status: ${currentGrant.taba_status_text || 'Unknown'}
+Type: ${currentGrant.taba_type || 'None'}
+Amount: ${currentGrant.formatted_taba_amount || 'N/A'}
+` : ''}
 
 Exported from BioTools Grant Matcher Pro
 ${new Date().toLocaleString()}
@@ -1197,6 +1540,13 @@ ${new Date().toLocaleString()}
                 if (!e.ctrlKey && !e.metaKey) {
                     e.preventDefault();
                     exportContactInfo();
+                }
+            }
+
+            if (e.key === 't' || e.key === 'T') {
+                if (!e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    exportTabaInfo();
                 }
             }
         });

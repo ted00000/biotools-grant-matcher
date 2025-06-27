@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Enhanced BioTools Grant Matcher Backend with Comprehensive Contact Information
-Handles company details, contact information, and enhanced grant details display
+Enhanced BioTools Grant Matcher Backend with Comprehensive TABA Tracking
+Handles company details, contact information, and enhanced TABA funding detection
 """
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 # Create logs directory
 os.makedirs('logs', exist_ok=True)
 
-# Cache management (same as before)
+# Cache management
 class SimpleCache:
     """Simple in-memory cache for frequently accessed data"""
     
@@ -96,8 +96,8 @@ class SimpleCache:
 # Initialize cache
 search_cache = SimpleCache(max_size=500, ttl=1800)  # 30 minutes TTL
 
-class EnhancedBiotoolsMatcherWithContacts:
-    """Enhanced grant matcher with contact information and company details"""
+class EnhancedBiotoolsMatcherWithTABA:
+    """Enhanced grant matcher with comprehensive TABA tracking and contact information"""
     
     def __init__(self, db_path=DATABASE_PATH):
         self.db_path = db_path
@@ -239,7 +239,7 @@ class EnhancedBiotoolsMatcherWithContacts:
         self._build_idf_cache()
     
     def get_grant_by_id(self, grant_id: int) -> Optional[Dict[str, Any]]:
-        """Get specific grant by ID with enhanced contact and company information"""
+        """Get specific grant by ID with enhanced TABA information"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -262,6 +262,12 @@ class EnhancedBiotoolsMatcherWithContacts:
                         grant['formatted_amount'] = str(grant.get('amount', 'N/A'))
                 else:
                     grant['formatted_amount'] = 'N/A'
+                
+                # NEW: Format TABA amount
+                if grant.get('taba_amount') and grant['taba_amount'] > 0:
+                    grant['formatted_taba_amount'] = f"${grant['taba_amount']:,}"
+                else:
+                    grant['formatted_taba_amount'] = 'N/A'
                 
                 # Format dates
                 for date_field in ['award_date', 'end_date', 'close_date', 'updated_at']:
@@ -289,6 +295,47 @@ class EnhancedBiotoolsMatcherWithContacts:
                     grant['compound_keywords_list'] = [kw.strip() for kw in grant['compound_keyword_matches'].split(',') if kw.strip()]
                 else:
                     grant['compound_keywords_list'] = []
+                
+                # NEW: Process TABA information
+                grant['has_taba_funding'] = bool(grant.get('has_taba_funding'))
+                grant['taba_amount'] = grant.get('taba_amount') or 0
+                grant['taba_type'] = grant.get('taba_type') or 'none'
+                grant['taba_confidence_score'] = grant.get('taba_confidence_score') or 0.0
+                grant['taba_eligible'] = bool(grant.get('taba_eligible'))
+                
+                # Parse TABA keywords
+                if grant.get('taba_keywords_matched'):
+                    grant['taba_keywords_list'] = [kw.strip() for kw in grant['taba_keywords_matched'].split(',') if kw.strip()]
+                else:
+                    grant['taba_keywords_list'] = []
+                
+                # Add TABA status information
+                taba_type = grant.get('taba_type', 'none')
+                if grant['has_taba_funding']:
+                    if taba_type == 'explicit':
+                        grant['taba_status_text'] = 'Explicitly mentions TABA funding'
+                        grant['taba_status_icon'] = '🎯'
+                        grant['taba_status_class'] = 'explicit'
+                    elif taba_type == 'likely':
+                        grant['taba_status_text'] = 'Likely has TABA funding'
+                        grant['taba_status_icon'] = '🔍'
+                        grant['taba_status_class'] = 'likely'
+                    elif taba_type == 'commercialization':
+                        grant['taba_status_text'] = 'Commercialization focus'
+                        grant['taba_status_icon'] = '📈'
+                        grant['taba_status_class'] = 'commercialization'
+                    else:
+                        grant['taba_status_text'] = 'TABA funding detected'
+                        grant['taba_status_icon'] = '💰'
+                        grant['taba_status_class'] = 'unknown'
+                elif grant['taba_eligible']:
+                    grant['taba_status_text'] = 'Eligible for TABA funding'
+                    grant['taba_status_icon'] = '✅'
+                    grant['taba_status_class'] = 'eligible'
+                else:
+                    grant['taba_status_text'] = 'No TABA funding'
+                    grant['taba_status_icon'] = '❌'
+                    grant['taba_status_class'] = 'not-eligible'
                 
                 # Enhanced company information processing
                 grant['display_company'] = grant.get('company_name') or grant.get('firm') or 'Unknown Company'
@@ -417,7 +464,8 @@ class EnhancedBiotoolsMatcherWithContacts:
                 )
                 
                 logger.info(f"Retrieved grant details: id={grant_id}, type={grant['inferred_type']}, "
-                          f"relevance={grant['biotools_relevance']:.2f}, contact_quality={grant['contact_quality_level']}")
+                          f"relevance={grant['biotools_relevance']:.2f}, taba_type={grant['taba_type']}, "
+                          f"contact_quality={grant['contact_quality_level']}")
                 return grant
             else:
                 logger.warning(f"Grant not found: id={grant_id}")
@@ -563,43 +611,47 @@ class EnhancedBiotoolsMatcherWithContacts:
         return False
 
     def get_database_stats(self) -> Dict[str, Any]:
-        """Get database statistics with contact information metrics"""
+        """Get enhanced database statistics including TABA information"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         try:
             stats = {}
             
-            # Total counts
+            # Basic counts
             cursor.execute("SELECT COUNT(*) FROM grants")
             total_grants = cursor.fetchone()[0]
             stats['total_grants'] = total_grants
             
-            # Count by type with biotools validation
-            cursor.execute("SELECT grant_type, COUNT(*) FROM grants WHERE grant_type IS NOT NULL GROUP BY grant_type")
-            type_counts_raw = cursor.fetchall()
-            type_counts = {'award': 0, 'solicitation': 0}
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE grant_type = 'award'")
+            stats['awards_count'] = cursor.fetchone()[0]
             
-            for gtype, count in type_counts_raw:
-                if gtype in type_counts:
-                    type_counts[gtype] = count
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE grant_type = 'solicitation'")
+            stats['solicitations_count'] = cursor.fetchone()[0]
             
-            # Count companies with contact information
-            try:
-                cursor.execute("""
-                    SELECT COUNT(*) FROM grants 
-                    WHERE (company_name IS NOT NULL AND company_name != '') 
-                       OR (firm IS NOT NULL AND firm != '')
-                """)
-                companies_count = cursor.fetchone()[0]
-            except sqlite3.OperationalError:
-                companies_count = 0
+            # TABA statistics
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE has_taba_funding = 1")
+            stats['total_taba_grants'] = cursor.fetchone()[0]
             
-            stats['awards_count'] = type_counts['award']
-            stats['solicitations_count'] = type_counts['solicitation'] 
-            stats['companies_count'] = companies_count
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE taba_eligible = 1")
+            stats['taba_eligible_grants'] = cursor.fetchone()[0]
             
-            # Contact information coverage statistics
+            cursor.execute("SELECT SUM(taba_amount) FROM grants WHERE has_taba_funding = 1")
+            stats['total_taba_funding'] = cursor.fetchone()[0] or 0
+            
+            # TABA adoption rate
+            if stats['taba_eligible_grants'] > 0:
+                stats['taba_adoption_rate'] = (stats['total_taba_grants'] / stats['taba_eligible_grants']) * 100
+            else:
+                stats['taba_adoption_rate'] = 0.0
+            
+            # Biotools relevance
+            cursor.execute("SELECT COUNT(*) FROM grants WHERE relevance_score >= 1.5")
+            biotools_relevant_count = cursor.fetchone()[0]
+            stats['biotools_relevant_count'] = biotools_relevant_count
+            stats['biotools_relevance_percentage'] = round((biotools_relevant_count / total_grants * 100), 1) if total_grants > 0 else 0
+            
+            # Company and contact stats
             cursor.execute("""
                 SELECT COUNT(*) FROM grants 
                 WHERE (poc_email IS NOT NULL AND poc_email != '') 
@@ -618,16 +670,18 @@ class EnhancedBiotoolsMatcherWithContacts:
             grants_with_company_info = cursor.fetchone()[0]
             stats['grants_with_company_info'] = grants_with_company_info
             
-            # Use stored relevance scores
-            cursor.execute("SELECT COUNT(*) FROM grants WHERE relevance_score >= 1.5")
-            biotools_relevant_count = cursor.fetchone()[0]
-            
-            stats['biotools_relevant_count'] = biotools_relevant_count
-            stats['biotools_relevance_percentage'] = round((biotools_relevant_count / total_grants * 100), 1) if total_grants > 0 else 0
-            
             # Contact coverage percentages
             stats['contact_coverage_percentage'] = round((grants_with_contact / total_grants * 100), 1) if total_grants > 0 else 0
             stats['company_info_coverage_percentage'] = round((grants_with_company_info / total_grants * 100), 1) if total_grants > 0 else 0
+            
+            # Companies count
+            cursor.execute("""
+                SELECT COUNT(*) FROM grants 
+                WHERE (company_name IS NOT NULL AND company_name != '') 
+                   OR (firm IS NOT NULL AND firm != '')
+            """)
+            companies_count = cursor.fetchone()[0]
+            stats['companies_count'] = companies_count
             
             # Agency breakdown
             cursor.execute("SELECT agency, COUNT(*) FROM grants GROUP BY agency ORDER BY COUNT(*) DESC LIMIT 10")
@@ -665,6 +719,10 @@ class EnhancedBiotoolsMatcherWithContacts:
                 'companies_count': 0,
                 'biotools_relevant_count': 0,
                 'biotools_relevance_percentage': 0,
+                'total_taba_grants': 0,
+                'taba_eligible_grants': 0,
+                'total_taba_funding': 0,
+                'taba_adoption_rate': 0,
                 'grants_with_contact_info': 0,
                 'grants_with_company_info': 0,
                 'contact_coverage_percentage': 0,
@@ -677,190 +735,16 @@ class EnhancedBiotoolsMatcherWithContacts:
         finally:
             conn.close()
 
-    # Search functionality (keeping existing methods but with contact info)
-    def search_grants(self, query: str, limit: int = 20, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-        """Enhanced biotools-specific search with contact information (existing method preserved)"""
-        # Implementation would be the same as before but with contact fields included
-        # For brevity, keeping the existing search logic but ensuring contact fields are returned
-        pass
 
-
-# Initialize the enhanced biotools matcher with contacts
-biotools_matcher = EnhancedBiotoolsMatcherWithContacts()
-
-# Keep all existing Flask routes and add security headers
-@app.after_request
-def add_security_headers(response):
-    """Add security headers to all responses"""
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-    response.headers['Content-Security-Policy'] = "default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:; connect-src 'self'"
-    response.headers.pop('Server', None)
-    return response
-
-@app.route('/')
-def index():
-    """Serve the enhanced biotools interface"""
-    return render_template('index.html')
-
-@app.route('/grant/<int:grant_id>')
-def grant_detail_page(grant_id):
-    """Serve grant detail page with comprehensive contact information"""
-    return render_template('grant_detail.html', grant_id=grant_id)
-
-@app.route('/api/grant/<int:grant_id>', methods=['GET'])
-@limiter.limit("100 per hour;10 per minute")
-def get_grant_details(grant_id):
-    """Get detailed information about a specific grant with comprehensive contact and company information"""
-    client_ip = get_remote_address()
-    
-    try:
-        if grant_id <= 0:
-            logger.warning(f"Invalid grant ID requested: {grant_id} from {client_ip}")
-            return jsonify({'error': 'Invalid grant ID'}), 400
-        
-        grant = biotools_matcher.get_grant_by_id(grant_id)
-        
-        if not grant:
-            logger.info(f"Grant not found: id={grant_id}, ip={client_ip}")
-            return jsonify({'error': 'Grant not found'}), 404
-        
-        logger.info(f"Grant details accessed: id={grant_id}, biotools_relevance={grant.get('biotools_relevance', 0):.1f}, "
-                   f"contact_quality={grant.get('contact_quality_level', 'unknown')}, ip={client_ip}")
-        return jsonify({
-            'success': True,
-            'grant': grant,
-            'meta': {
-                'retrieved_at': datetime.now().isoformat(),
-                'biotools_validated': grant.get('biotools_relevance', 0) >= 1.0,
-                'has_contact_info': grant.get('has_any_contact', False),
-                'contact_quality': grant.get('contact_quality_level', 'minimal')
-            }
-        })
-        
-    except Exception as e:
-        logger.error(f"Grant details error: id={grant_id}, ip={client_ip}, error={e}")
-        return jsonify({'error': 'Internal server error'}), 500
-
-@app.route('/api/stats', methods=['GET'])
-@limiter.limit("60 per hour;10 per minute")
-def get_stats():
-    """Get enhanced database statistics with contact information metrics"""
-    try:
-        stats = biotools_matcher.get_database_stats()
-        return jsonify(stats)
-        
-    except Exception as e:
-        logger.error(f"Stats error: {e}")
-        return jsonify({
-            'error': 'Internal server error',
-            'total_grants': 0,
-            'awards_count': 0,
-            'solicitations_count': 0,
-            'companies_count': 0,
-            'biotools_relevant_count': 0,
-            'biotools_relevance_percentage': 0,
-            'grants_with_contact_info': 0,
-            'grants_with_company_info': 0,
-            'contact_coverage_percentage': 0,
-            'company_info_coverage_percentage': 0,
-            'recent_grants': 0,
-            'open_solicitations': 0,
-            'agencies': [],
-            'last_updated': datetime.now().isoformat()
-        }), 500
-
-# Keep all other existing routes (search, feedback, health, etc.)
-@app.route('/api/search', methods=['POST'])
-@limiter.limit("50 per hour;5 per minute")
-def search_grants():
-    """Enhanced biotools search with mandatory taxonomy validation and browse mode support"""
-    client_ip = get_remote_address()
-    
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No JSON data provided'}), 400
-        
-        # Query is now optional (can be empty for browse mode)
-        query = data.get('query', '').strip()
-        limit = min(data.get('limit', 20), 50)
-        filters = data.get('filters', {})
-        
-        # Extract biotools taxonomy requirements
-        tool_types = filters.get('tool_types', [])
-        focus_areas = filters.get('focus_areas', [])
-        browse_mode = filters.get('browse_mode', False) or len(query) == 0
-        
-        # Validate biotools requirements
-        if not tool_types or not focus_areas:
-            return jsonify({
-                'error': 'Biotools taxonomy validation failed',
-                'message': 'Must select at least one Tool Type and Focus Area for precision biotools search',
-                'required': {
-                    'tool_types': tool_types,
-                    'focus_areas': focus_areas
-                }
-            }), 400
-        
-        # Validate query if provided (not in browse mode)
-        if not browse_mode and len(query) < 2:
-            return jsonify({'error': 'Query too short (minimum 2 characters)'}), 400
-        
-        # Check for suspicious patterns in query if provided
-        if query:
-            suspicious_patterns = ['union', 'select', 'drop', 'delete', 'insert', '--', '/*', '*/', ';']
-            query_lower = query.lower()
-            if any(pattern in query_lower for pattern in suspicious_patterns):
-                logger.warning(f"Suspicious query detected from {client_ip}: {query}")
-                return jsonify({'error': 'Invalid query format'}), 400
-        
-        # Perform biotools-validated search using simplified approach
-        grants = search_grants_with_contacts(query, limit, filters)
-        
-        # Log the search with biotools context
-        data_type = filters.get('data_type', 'all')
-        mode = "browse" if browse_mode else "search"
-        logger.info(f"Biotools {mode}: query='{query}', types={tool_types}, areas={focus_areas}, results={len(grants)}, ip={client_ip}")
-        
-        # Create display query for frontend
-        if browse_mode:
-            display_query = f"Browsing: {', '.join(tool_types)} • {', '.join(focus_areas)}"
-        else:
-            display_query = query
-        
-        return jsonify({
-            'query': display_query,
-            'original_query': query,
-            'browse_mode': browse_mode,
-            'data_type': data_type,
-            'tool_types': tool_types,
-            'focus_areas': focus_areas,
-            'results': grants,
-            'total_found': len(grants),
-            'biotools_validated': True,
-            'precision_mode': True,
-            'timestamp': datetime.now().isoformat()
-        })
-        
-    except ValueError as e:
-        logger.warning(f"Validation error from {client_ip}: {e}")
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        logger.error(f"Search error from {client_ip}: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
-
-
-def search_grants_with_contacts(query: str, limit: int = 20, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
-    """Simplified search function that works with the enhanced contact database"""
+def search_grants_with_contacts_and_taba(query: str, limit: int = 20, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    """Enhanced search function with TABA filtering support"""
     if not filters:
         filters = {}
     
-    # Extract biotools taxonomy from filters
+    # Extract filters
     tool_types = filters.get('tool_types', [])
     focus_areas = filters.get('focus_areas', [])
+    taba_filters = filters.get('taba_filters', [])  # NEW: TABA filters
     browse_mode = filters.get('browse_mode', False) or len(query.strip()) == 0
     data_type = filters.get('data_type', 'all')
     
@@ -888,7 +772,7 @@ def search_grants_with_contacts(query: str, limit: int = 20, filters: Dict[str, 
             search_pattern = f"%{query}%"
             params.extend([search_pattern, search_pattern, search_pattern])
         
-        # Add biotools category filtering (simplified)
+        # Add biotools category filtering
         category_filters = []
         for tool_type in tool_types:
             category_filters.append(f"biotools_category LIKE '%{tool_type}%'")
@@ -898,8 +782,27 @@ def search_grants_with_contacts(query: str, limit: int = 20, filters: Dict[str, 
         if category_filters:
             base_query += f" AND ({' OR '.join(category_filters)})"
         
+        # NEW: Add TABA filtering
+        if taba_filters:
+            taba_conditions = []
+            for taba_filter in taba_filters:
+                if taba_filter == 'explicit':
+                    taba_conditions.append("(has_taba_funding = 1 AND taba_type = 'explicit')")
+                elif taba_filter == 'likely':
+                    taba_conditions.append("(has_taba_funding = 1 AND taba_type = 'likely')")
+                elif taba_filter == 'commercialization':
+                    taba_conditions.append("(has_taba_funding = 1 AND taba_type = 'commercialization')")
+                elif taba_filter == 'eligible':
+                    taba_conditions.append("taba_eligible = 1")
+            
+            if taba_conditions:
+                base_query += f" AND ({' OR '.join(taba_conditions)})"
+        
         # Order by relevance and limit
-        base_query += " ORDER BY relevance_score DESC, confidence_score DESC LIMIT ?"
+        base_query += " ORDER BY relevance_score DESC, confidence_score DESC"
+        if taba_filters:
+            base_query += ", has_taba_funding DESC, taba_amount DESC"  # Prioritize TABA grants
+        base_query += " LIMIT ?"
         params.append(limit)
         
         cursor.execute(base_query, params)
@@ -921,6 +824,13 @@ def search_grants_with_contacts(query: str, limit: int = 20, filters: Dict[str, 
                 grant.get('company_url')
             )
             
+            # Ensure TABA fields are present
+            grant['has_taba_funding'] = bool(grant.get('has_taba_funding'))
+            grant['taba_amount'] = grant.get('taba_amount') or 0
+            grant['taba_type'] = grant.get('taba_type') or 'none'
+            grant['taba_confidence_score'] = grant.get('taba_confidence_score') or 0.0
+            grant['taba_eligible'] = bool(grant.get('taba_eligible'))
+            
             grants.append(grant)
         
         return grants
@@ -932,10 +842,137 @@ def search_grants_with_contacts(query: str, limit: int = 20, filters: Dict[str, 
         conn.close()
 
 
-@app.route('/api/feedback', methods=['POST'])
-@limiter.limit("20 per hour;2 per minute")
-def submit_feedback():
-    """Submit user feedback with validation"""
+# Initialize the enhanced biotools matcher with TABA
+biotools_matcher = EnhancedBiotoolsMatcherWithTABA()
+
+# Security headers
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Content-Security-Policy'] = "default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data:; connect-src 'self'"
+    response.headers.pop('Server', None)
+    return response
+
+@app.route('/')
+def index():
+    """Serve the enhanced biotools interface"""
+    return render_template('index.html')
+
+@app.route('/grant/<int:grant_id>')
+def grant_detail_page(grant_id):
+    """Serve grant detail page with comprehensive contact and TABA information"""
+    return render_template('grant_detail.html', grant_id=grant_id)
+
+@app.route('/api/grant/<int:grant_id>', methods=['GET'])
+@limiter.limit("100 per hour;10 per minute")
+def get_grant_details(grant_id):
+    """Get detailed information about a specific grant with comprehensive TABA information"""
+    client_ip = get_remote_address()
+    
+    try:
+        if grant_id <= 0:
+            logger.warning(f"Invalid grant ID requested: {grant_id} from {client_ip}")
+            return jsonify({'error': 'Invalid grant ID'}), 400
+        
+        grant = biotools_matcher.get_grant_by_id(grant_id)
+        
+        if not grant:
+            logger.info(f"Grant not found: id={grant_id}, ip={client_ip}")
+            return jsonify({'error': 'Grant not found'}), 404
+        
+        # Ensure TABA fields are properly formatted
+        grant['has_taba_funding'] = bool(grant.get('has_taba_funding'))
+        grant['taba_amount'] = grant.get('taba_amount') or 0
+        grant['taba_type'] = grant.get('taba_type') or 'none'
+        grant['taba_confidence_score'] = grant.get('taba_confidence_score') or 0.0
+        grant['taba_eligible'] = bool(grant.get('taba_eligible'))
+        
+        # Format TABA amount for display
+        if grant['taba_amount'] > 0:
+            grant['formatted_taba_amount'] = f"${grant['taba_amount']:,}"
+        else:
+            grant['formatted_taba_amount'] = 'N/A'
+        
+        # Parse TABA keywords if present
+        if grant.get('taba_keywords_matched'):
+            grant['taba_keywords_list'] = [kw.strip() for kw in grant['taba_keywords_matched'].split(',') if kw.strip()]
+        else:
+            grant['taba_keywords_list'] = []
+        
+        # Add TABA status description
+        taba_type = grant.get('taba_type', 'none')
+        if taba_type == 'explicit':
+            grant['taba_status_description'] = 'Explicitly mentions TABA funding or amounts'
+        elif taba_type == 'likely':
+            grant['taba_status_description'] = 'Strong indicators of TABA funding'
+        elif taba_type == 'commercialization':
+            grant['taba_status_description'] = 'Focus on commercialization activities'
+        elif grant.get('taba_eligible'):
+            grant['taba_status_description'] = 'Eligible for TABA funding from this agency'
+        else:
+            grant['taba_status_description'] = 'No TABA funding indicators'
+        
+        logger.info(f"Grant details accessed: id={grant_id}, biotools_relevance={grant.get('biotools_relevance', 0):.1f}, "
+                   f"taba_status={taba_type}, contact_quality={grant.get('contact_quality_level', 'unknown')}, ip={client_ip}")
+        
+        return jsonify({
+            'success': True,
+            'grant': grant,
+            'meta': {
+                'retrieved_at': datetime.now().isoformat(),
+                'biotools_validated': grant.get('biotools_relevance', 0) >= 1.0,
+                'has_contact_info': grant.get('has_any_contact', False),
+                'contact_quality': grant.get('contact_quality_level', 'minimal'),
+                'has_taba_funding': grant.get('has_taba_funding', False),
+                'taba_type': grant.get('taba_type', 'none'),
+                'taba_eligible': grant.get('taba_eligible', False)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Grant details error: id={grant_id}, ip={client_ip}, error={e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/stats', methods=['GET'])
+@limiter.limit("60 per hour;10 per minute")
+def get_stats():
+    """Get enhanced database statistics with TABA information metrics"""
+    try:
+        stats = biotools_matcher.get_database_stats()
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"Stats error: {e}")
+        return jsonify({
+            'error': 'Internal server error',
+            'total_grants': 0,
+            'awards_count': 0,
+            'solicitations_count': 0,
+            'companies_count': 0,
+            'biotools_relevant_count': 0,
+            'biotools_relevance_percentage': 0,
+            'total_taba_grants': 0,
+            'taba_eligible_grants': 0,
+            'total_taba_funding': 0,
+            'taba_adoption_rate': 0,
+            'grants_with_contact_info': 0,
+            'grants_with_company_info': 0,
+            'contact_coverage_percentage': 0,
+            'company_info_coverage_percentage': 0,
+            'recent_grants': 0,
+            'open_solicitations': 0,
+            'agencies': [],
+            'last_updated': datetime.now().isoformat()
+        }), 500
+
+@app.route('/api/search', methods=['POST'])
+@limiter.limit("50 per hour;5 per minute")
+def search_grants():
+    """Enhanced biotools search with TABA support"""
     client_ip = get_remote_address()
     
     try:
@@ -943,142 +980,342 @@ def submit_feedback():
         if not data:
             return jsonify({'error': 'No JSON data provided'}), 400
         
-        # Validate required fields
-        required_fields = ['grant_id', 'feedback_type']
-        for field in required_fields:
-            if field not in data or not data[field]:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
+        # Query is now optional (can be empty for browse mode)
+        query = data.get('query', '').strip()
+        limit = min(data.get('limit', 20), 50)
+        filters = data.get('filters', {})
         
-        # Validate values
-        valid_types = ['helpful', 'not_helpful', 'applied', 'bookmarked']
-        if data['feedback_type'] not in valid_types:
-            return jsonify({'error': 'Invalid feedback type'}), 400
+        # Extract biotools taxonomy requirements
+        tool_types = filters.get('tool_types', [])
+        focus_areas = filters.get('focus_areas', [])
+        taba_filters = filters.get('taba_filters', [])  # NEW: TABA filters
+        browse_mode = filters.get('browse_mode', False) or len(query) == 0
         
-        grant_id = data['grant_id']
-        if not isinstance(grant_id, int) or grant_id <= 0:
-            return jsonify({'error': 'Invalid grant ID'}), 400
+        # Validate biotools requirements
+        if not tool_types or not focus_areas:
+            return jsonify({
+                'error': 'Biotools taxonomy validation failed',
+                'message': 'Must select at least one Tool Type and Focus Area for precision biotools search',
+                'required': {
+                    'tool_types': tool_types,
+                    'focus_areas': focus_areas
+                }
+            }), 400
         
-        # Sanitize text fields
-        notes = data.get('notes', '')
-        if len(notes) > 500:
-            return jsonify({'error': 'Notes too long (maximum 500 characters)'}), 400
+        # Validate query if provided (not in browse mode)
+        if not browse_mode and len(query) < 2:
+            return jsonify({'error': 'Query too short (minimum 2 characters)'}), 400
         
-        search_query = data.get('search_query', '')
-        if len(search_query) > 200:
-            return jsonify({'error': 'Search query too long (maximum 200 characters)'}), 400
+        # Check for suspicious patterns in query if provided
+        if query:
+            suspicious_patterns = ['union', 'select', 'drop', 'delete', 'insert', '--', '/*', '*/', ';']
+            query_lower = query.lower()
+            if any(pattern in query_lower for pattern in suspicious_patterns):
+                logger.warning(f"Suspicious query detected from {client_ip}: {query}")
+                return jsonify({'error': 'Invalid query format'}), 400
         
+        # Perform biotools-validated search with TABA support
+        grants = search_grants_with_contacts_and_taba(query, limit, filters)
+        
+        # Log the search with biotools context
+        data_type = filters.get('data_type', 'all')
+        mode = "browse" if browse_mode else "search"
+        taba_info = f", taba_filters={taba_filters}" if taba_filters else ""
+        logger.info(f"Biotools {mode}: query='{query}', types={tool_types}, areas={focus_areas}{taba_info}, results={len(grants)}, ip={client_ip}")
+        
+        # Create display query for frontend
+        if browse_mode:
+            display_query = f"Browsing: {', '.join(tool_types)} • {', '.join(focus_areas)}"
+        else:
+            display_query = query
+        
+        # Add TABA info to display query if filters applied
+        if taba_filters:
+            display_query += f" (TABA: {', '.join(taba_filters)})"
+        
+        return jsonify({
+            'query': display_query,
+            'original_query': query,
+            'browse_mode': browse_mode,
+            'data_type': data_type,
+            'tool_types': tool_types,
+            'focus_areas': focus_areas,
+            'taba_filters': taba_filters,  # NEW: Return TABA filters
+            'results': grants,
+            'total_found': len(grants),
+            'biotools_validated': True,
+            'taba_enabled': True,  # NEW: Indicate TABA support
+            'precision_mode': True,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except ValueError as e:
+        logger.warning(f"Validation error from {client_ip}: {e}")
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Search error from {client_ip}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/taba-stats', methods=['GET'])
+@limiter.limit("60 per hour;10 per minute")
+def get_taba_stats():
+    """Get detailed TABA statistics"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        stats = {}
+        
+        # Basic TABA counts
+        cursor.execute("SELECT COUNT(*) FROM grants WHERE has_taba_funding = 1")
+        stats['total_taba_grants'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM grants WHERE taba_eligible = 1")
+        stats['taba_eligible_grants'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM grants")
+        total_grants = cursor.fetchone()[0]
+        stats['total_grants'] = total_grants
+        
+        # TABA adoption rate
+        if stats['taba_eligible_grants'] > 0:
+            stats['taba_adoption_rate'] = round((stats['total_taba_grants'] / stats['taba_eligible_grants']) * 100, 1)
+        else:
+            stats['taba_adoption_rate'] = 0.0
+        
+        # TABA by type
+        cursor.execute("SELECT taba_type, COUNT(*) FROM grants WHERE has_taba_funding = 1 GROUP BY taba_type")
+        taba_by_type = cursor.fetchall()
+        stats['taba_by_type'] = {ttype: count for ttype, count in taba_by_type}
+        
+        # TABA by agency
+        cursor.execute("SELECT agency, COUNT(*) FROM grants WHERE has_taba_funding = 1 GROUP BY agency ORDER BY COUNT(*) DESC")
+        taba_by_agency = cursor.fetchall()
+        stats['taba_by_agency'] = {agency: count for agency, count in taba_by_agency}
+        
+        # TABA amounts distribution
+        cursor.execute("SELECT taba_amount, COUNT(*) FROM grants WHERE has_taba_funding = 1 AND taba_amount > 0 GROUP BY taba_amount ORDER BY taba_amount")
+        taba_amounts = cursor.fetchall()
+        stats['taba_amounts_distribution'] = {amount: count for amount, count in taba_amounts}
+        
+        # Total TABA funding
+        cursor.execute("SELECT SUM(taba_amount) FROM grants WHERE has_taba_funding = 1")
+        total_taba_funding = cursor.fetchone()[0] or 0
+        stats['total_taba_funding'] = total_taba_funding
+        
+        # Average TABA confidence
+        cursor.execute("SELECT AVG(taba_confidence_score) FROM grants WHERE has_taba_funding = 1")
+        avg_confidence = cursor.fetchone()[0] or 0
+        stats['avg_taba_confidence'] = round(avg_confidence, 2)
+        
+        # TABA by biotools relevance
+        cursor.execute("SELECT COUNT(*) FROM grants WHERE has_taba_funding = 1 AND relevance_score >= 1.5")
+        stats['biotools_relevant_with_taba'] = cursor.fetchone()[0]
+        
+        # Phase distribution for TABA
+        cursor.execute("SELECT phase, COUNT(*) FROM grants WHERE has_taba_funding = 1 GROUP BY phase")
+        taba_by_phase = cursor.fetchall()
+        stats['taba_by_phase'] = {phase or 'Unknown': count for phase, count in taba_by_phase}
+        
+        # TABA trends by year (if award_date is available)
+        cursor.execute("""
+            SELECT substr(award_date, 1, 4) as year, COUNT(*)
+            FROM grants 
+            WHERE has_taba_funding = 1 AND award_date IS NOT NULL AND award_date != ''
+            GROUP BY substr(award_date, 1, 4)
+            ORDER BY year DESC
+            LIMIT 5
+        """)
+        taba_by_year = cursor.fetchall()
+        stats['taba_by_year'] = {year: count for year, count in taba_by_year if year}
+        
+        conn.close()
+        
+        return jsonify(stats)
+        
+    except Exception as e:
+        logger.error(f"TABA stats error: {e}")
+        return jsonify({
+            'error': 'Internal server error',
+            'total_taba_grants': 0,
+            'taba_eligible_grants': 0,
+            'total_grants': 0,
+            'taba_adoption_rate': 0.0,
+            'taba_by_type': {},
+            'taba_by_agency': {},
+            'taba_amounts_distribution': {},
+            'total_taba_funding': 0,
+            'avg_taba_confidence': 0.0,
+            'biotools_relevant_with_taba': 0,
+            'taba_by_phase': {},
+            'taba_by_year': {}
+        }), 500
+
+@app.route('/api/export/taba', methods=['GET'])
+@limiter.limit("10 per hour;2 per minute")
+def export_taba_data():
+    """Export TABA grants data as CSV"""
+    try:
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS grant_feedback (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                grant_id INTEGER NOT NULL,
-                search_query TEXT,
-                feedback_type TEXT CHECK (feedback_type IN ('helpful', 'not_helpful', 'applied', 'bookmarked')),
-                user_session TEXT,
-                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-                notes TEXT,
-                FOREIGN KEY (grant_id) REFERENCES grants(id) ON DELETE CASCADE
-            )
+            SELECT title, agency, program, firm, principal_investigator, amount, award_date, phase,
+                   has_taba_funding, taba_type, taba_amount, taba_confidence_score,
+                   taba_keywords_matched, relevance_score, biotools_category
+            FROM grants 
+            WHERE has_taba_funding = 1
+            ORDER BY taba_amount DESC, relevance_score DESC
         """)
         
-        cursor.execute("""
-            INSERT INTO grant_feedback 
-            (grant_id, search_query, feedback_type, user_session, notes, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            grant_id,
-            search_query,
-            data['feedback_type'],
-            client_ip,
-            notes,
-            datetime.now().isoformat()
-        ))
-        
-        conn.commit()
+        results = cursor.fetchall()
         conn.close()
         
-        logger.info(f"Feedback submitted: grant_id={grant_id}, type={data['feedback_type']}, ip={client_ip}")
+        if not results:
+            return jsonify({'error': 'No TABA grants found'}), 404
         
-        return jsonify({'status': 'success', 'message': 'Feedback recorded'})
+        # Create CSV content
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write headers
+        headers = [
+            'Title', 'Agency', 'Program', 'Company', 'Principal Investigator',
+            'Award Amount', 'Award Date', 'Phase', 'TABA Type', 'TABA Amount',
+            'TABA Confidence', 'TABA Keywords', 'Biotools Score', 'Biotools Categories'
+        ]
+        writer.writerow(headers)
+        
+        # Write data
+        for row in results:
+            writer.writerow([
+                row[0] or '',  # title
+                row[1] or '',  # agency
+                row[2] or '',  # program
+                row[3] or '',  # firm
+                row[4] or '',  # principal_investigator
+                row[5] or '',  # amount
+                row[6] or '',  # award_date
+                row[7] or '',  # phase
+                row[9] or '',  # taba_type
+                row[10] or '',  # taba_amount
+                row[11] or '',  # taba_confidence_score
+                row[12] or '',  # taba_keywords_matched
+                row[13] or '',  # relevance_score
+                row[14] or ''  # biotools_category
+            ])
+        
+        csv_content = output.getvalue()
+        output.close()
+        
+        # Return CSV as response
+        return Response(
+            csv_content,
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=biotools_taba_grants_{datetime.now().strftime("%Y%m%d")}.csv'
+            }
+        )
         
     except Exception as e:
-        logger.error(f"Feedback error from {client_ip}: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
-
+        logger.error(f"TABA export error: {e}")
+        return jsonify({'error': 'Export failed'}), 500
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Health check endpoint for monitoring"""
+    """Health check endpoint"""
     try:
-        # Check database connectivity
+        # Test database connection
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM grants LIMIT 1")
-        grant_count = cursor.fetchone()[0]
+        count = cursor.fetchone()[0]
         conn.close()
         
-        # Check biotools matcher
-        matcher_status = len(biotools_matcher.idf_cache) > 0
-        
-        health_status = {
+        return jsonify({
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
-            'database': {
-                'connected': True,
-                'grant_count': grant_count
-            },
-            'biotools_matcher': {
-                'initialized': matcher_status,
-                'idf_cache_size': len(biotools_matcher.idf_cache)
-            },
-            'version': '2.0.0-enhanced'
-        }
-        
-        return jsonify(health_status)
+            'database_accessible': True,
+            'total_grants': count,
+            'cache_size': len(search_cache.cache)
+        })
         
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return jsonify({
             'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'error': str(e)
         }), 500
-
 
 @app.errorhandler(404)
 def not_found(error):
-    return jsonify({'error': 'Endpoint not found'}), 404
-
+    """Handle 404 errors"""
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'API endpoint not found'}), 404
+    return render_template('index.html'), 404
 
 @app.errorhandler(429)
-def rate_limit_handler(error):
-    client_ip = get_remote_address()
-    logger.warning(f"Rate limit exceeded for {client_ip}")
+def ratelimit_handler(e):
+    """Handle rate limit errors"""
+    logger.warning(f"Rate limit exceeded: {get_remote_address()}")
     return jsonify({
         'error': 'Rate limit exceeded',
-        'message': 'Please wait before making more requests'
+        'message': 'Too many requests. Please slow down.',
+        'retry_after': str(e.retry_after)
     }), 429
-
 
 @app.errorhandler(500)
 def internal_error(error):
+    """Handle internal server errors"""
     logger.error(f"Internal server error: {error}")
     return jsonify({'error': 'Internal server error'}), 500
 
-if __name__ == '__main__':
-    if not os.path.exists(DATABASE_PATH):
-        logger.error("Database not found. Run the enhanced scraper first.")
-        exit(1)
-    else:
-        logger.info("Enhanced BioTools Grant Matcher with Contact Information initialized successfully!")
-        logger.info(f"Biotools IDF cache contains {len(biotools_matcher.idf_cache)} terms")
-        
-        # Log initial stats with contact metrics
-        stats = biotools_matcher.get_database_stats()
-        logger.info(f"Database: {stats['total_grants']} total grants, {stats['biotools_relevant_count']} biotools-relevant ({stats['biotools_relevance_percentage']}%)")
-        logger.info(f"Contact Coverage: {stats['contact_coverage_percentage']}% with contact info, {stats['company_info_coverage_percentage']}% with company details")
-        logger.info(f"Breakdown: {stats['awards_count']} awards, {stats['solicitations_count']} solicitations, {stats['companies_count']} companies")
+# Performance monitoring
+@app.before_request
+def before_request():
+    """Log request start time for performance monitoring"""
+    request.start_time = time.time()
+
+@app.after_request
+def after_request(response):
+    """Log request completion and performance metrics"""
+    if hasattr(request, 'start_time'):
+        duration = time.time() - request.start_time
+        if duration > 1.0:  # Log slow requests
+            logger.warning(f"Slow request: {request.method} {request.path} took {duration:.2f}s")
     
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    return response
+
+if __name__ == '__main__':
+    # Validate database exists
+    if not os.path.exists(DATABASE_PATH):
+        logger.error(f"Database not found at {DATABASE_PATH}")
+        exit(1)
+    
+    # Validate required directories
+    os.makedirs('logs', exist_ok=True)
+    os.makedirs('templates', exist_ok=True)
+    
+    # Initialize cache
+    try:
+        biotools_matcher._build_idf_cache()
+        logger.info("BioTools Grant Matcher with TABA Support initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize biotools matcher: {e}")
+        exit(1)
+    
+    # Run the application
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('FLASK_ENV') == 'development'
+    
+    logger.info(f"Starting Enhanced BioTools Grant Matcher with TABA Support on port {port}")
+    logger.info(f"Debug mode: {debug}")
+    logger.info(f"Database: {DATABASE_PATH}")
+    
+    app.run(
+        host='0.0.0.0',
+        port=port,
+        debug=debug,
+        threaded=True
+    )
