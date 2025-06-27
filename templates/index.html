@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BioTools Grant Matcher Pro - Enhanced</title>
+    <title>BioTools Grant Matcher Pro - Enhanced with TABA Tracking</title>
     <style>
         * {
             margin: 0;
@@ -57,6 +57,7 @@
             border-radius: 20px;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
         }
 
         .stat-number {
@@ -70,6 +71,22 @@
             opacity: 0.8;
         }
 
+        /* Enhanced TABA Statistics */
+        .taba-stats {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 25px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+            animation: pulse 2s infinite;
+        }
+
+        .taba-stats .stat-number {
+            font-size: 1.8rem;
+            font-weight: 800;
+        }
+
         .search-section {
             background: white;
             border-radius: 16px;
@@ -79,7 +96,7 @@
             animation: slideInUp 0.8s ease-out;
         }
 
-        /* Enhanced Progress Indicator */
+        /* Enhanced Progress Indicator with TABA */
         .progress-indicator {
             display: flex;
             justify-content: space-between;
@@ -117,6 +134,66 @@
 
         .step-text {
             font-weight: 500;
+        }
+
+        /* TABA Information Panel */
+        .taba-info-panel {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .taba-info-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #ffd700, #ff6b6b, #ffd700);
+        }
+
+        .taba-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .taba-header h3 {
+            font-size: 1.4rem;
+            margin-left: 15px;
+            font-weight: 700;
+        }
+
+        .taba-benefits {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .taba-benefit {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #ffd700;
+        }
+
+        .taba-benefit-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .taba-benefit-text {
+            font-size: 0.9rem;
+            opacity: 0.9;
         }
 
         /* Enhanced Data Type Selector */
@@ -353,6 +430,63 @@
             font-weight: bold;
         }
 
+        /* TABA Filter Panel */
+        .taba-filter-panel {
+            background: linear-gradient(135deg, #f8fff9 0%, #e8f5e8 100%);
+            border: 2px solid #28a745;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .taba-filter-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .taba-filter-header h4 {
+            color: #155724;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .taba-filter-options {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .taba-filter-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 2px solid #c3e6cb;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .taba-filter-option:hover {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+
+        .taba-filter-option.selected {
+            background: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+
+        .taba-filter-option input[type="checkbox"] {
+            margin: 0;
+        }
+
         /* Enhanced Search Input */
         .smart-search-container {
             position: relative;
@@ -519,7 +653,7 @@
             box-shadow: 0 4px 8px rgba(102, 126, 234, 0.2);
         }
 
-        /* Results Section */
+        /* Results Section with TABA */
         .results-section {
             background: white;
             border-radius: 16px;
@@ -571,6 +705,7 @@
             border-color: #667eea;
         }
 
+        /* Enhanced Result Card with TABA Icons */
         .result-card {
             background: white;
             border: 1px solid #e9ecef;
@@ -586,6 +721,11 @@
             border-color: #667eea;
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.1);
             transform: translateY(-2px);
+        }
+
+        .result-card.has-taba {
+            border-left: 6px solid #28a745;
+            background: linear-gradient(135deg, #f8fff9 0%, #ffffff 100%);
         }
 
         .result-header {
@@ -604,6 +744,12 @@
             margin-right: 15px;
         }
 
+        .result-badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
         .result-score {
             background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
             color: white;
@@ -613,6 +759,65 @@
             font-weight: bold;
             min-width: 50px;
             text-align: center;
+        }
+
+        /* TABA Status Icons and Badges */
+        .taba-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .taba-status.explicit {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: 2px solid #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        .taba-status.likely {
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            color: white;
+            border: 2px solid #17a2b8;
+        }
+
+        .taba-status.commercialization {
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+            color: #212529;
+            border: 2px solid #ffc107;
+        }
+
+        .taba-status.eligible {
+            background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+            color: white;
+            border: 2px solid #6c757d;
+        }
+
+        .taba-status.not-eligible {
+            background: #f8f9fa;
+            color: #6c757d;
+            border: 2px solid #dee2e6;
+        }
+
+        .taba-icon {
+            font-size: 1rem;
+            margin-right: 4px;
+        }
+
+        .taba-amount {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 5px;
         }
 
         .result-meta {
@@ -660,6 +865,13 @@
             background: #e8f4fd;
             color: #0056b3;
             border-color: #bee5eb;
+        }
+
+        .result-tag.taba {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            color: #155724;
+            border-color: #28a745;
+            font-weight: 600;
         }
 
         .result-actions {
@@ -718,6 +930,35 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* Tooltip Styles */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .tooltip:hover::after {
+            opacity: 1;
+            visibility: visible;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .container {
@@ -744,6 +985,14 @@
                 grid-template-columns: 1fr;
             }
             
+            .taba-benefits {
+                grid-template-columns: 1fr;
+            }
+            
+            .taba-filter-options {
+                flex-direction: column;
+            }
+            
             .search-form {
                 flex-direction: column;
             }
@@ -761,6 +1010,10 @@
             .result-header {
                 flex-direction: column;
                 gap: 10px;
+            }
+            
+            .result-badges {
+                justify-content: flex-start;
             }
             
             .result-actions {
@@ -802,27 +1055,12 @@
             }
         }
 
-        /* Dark mode support */
-        @media (prefers-color-scheme: dark) {
-            body {
-                background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
             }
-            
-            .search-section, .results-section {
-                background: #2c3e50;
-                color: #ecf0f1;
-            }
-            
-            .data-type-option {
-                background: #34495e;
-                border-color: #4a5f7a;
-                color: #ecf0f1;
-            }
-            
-            .search-input {
-                background: #34495e;
-                border-color: #4a5f7a;
-                color: #ecf0f1;
+            50% {
+                transform: scale(1.05);
             }
         }
     </style>
@@ -831,7 +1069,7 @@
     <div class="container">
         <div class="header">
             <h1>🧬 BioTools Grant Matcher Pro</h1>
-            <p>Precision funding discovery for life science research tools</p>
+            <p>Precision funding discovery with enhanced TABA tracking</p>
             
             <div class="stats-bar" id="stats-bar">
                 <div class="stat-item">
@@ -842,9 +1080,9 @@
                     <span class="stat-number" id="biotools-relevant">--</span>
                     <span class="stat-label">BioTools Relevant</span>
                 </div>
-                <div class="stat-item">
-                    <span class="stat-number" id="open-solicitations">--</span>
-                    <span class="stat-label">Open Opportunities</span>
+                <div class="taba-stats">
+                    <span class="stat-number" id="taba-grants">--</span>
+                    <span class="stat-label">💰 TABA Funding</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-number" id="precision-rate">--%</span>
@@ -865,8 +1103,55 @@
                     <span class="step-text">Select Categories</span>
                 </div>
                 <div class="progress-step" id="step-3">
-                    <span class="step-icon">🔍</span>
-                    <span class="step-text">Search & Discover</span>
+                    <span class="step-icon">💰</span>
+                    <span class="step-text">TABA & Discovery</span>
+                </div>
+            </div>
+
+            <!-- TABA Information Panel -->
+            <div class="taba-info-panel">
+                <div class="taba-header">
+                    <span style="font-size: 1.8rem;">💰</span>
+                    <h3>Technical & Business Assistance (TABA) Funding</h3>
+                </div>
+                <p style="margin-bottom: 15px; font-size: 1rem;">
+                    TABA provides additional funding over and above SBIR/STTR awards for commercialization assistance.
+                    Up to <strong>$6,500 for Phase I</strong> and <strong>$50,000 for Phase II</strong> projects.
+                </p>
+                
+                <div class="taba-benefits">
+                    <div class="taba-benefit">
+                        <div class="taba-benefit-title">
+                            <span>🔧</span> Technical Assistance
+                        </div>
+                        <div class="taba-benefit-text">
+                            Solve technical problems, minimize risks, and make better decisions
+                        </div>
+                    </div>
+                    <div class="taba-benefit">
+                        <div class="taba-benefit-title">
+                            <span>📈</span> Business Development
+                        </div>
+                        <div class="taba-benefit-text">
+                            Market research, customer discovery, and commercialization planning
+                        </div>
+                    </div>
+                    <div class="taba-benefit">
+                        <div class="taba-benefit-title">
+                            <span>⚖️</span> IP Protection
+                        </div>
+                        <div class="taba-benefit-text">
+                            Intellectual property strategy and protection services
+                        </div>
+                    </div>
+                    <div class="taba-benefit">
+                        <div class="taba-benefit-title">
+                            <span>🏭</span> Manufacturing
+                        </div>
+                        <div class="taba-benefit-text">
+                            Manufacturing plans and scale-up strategies
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -958,6 +1243,37 @@
                 </div>
             </div>
 
+            <!-- TABA Filter Panel -->
+            <div class="taba-filter-panel">
+                <div class="taba-filter-header">
+                    <span style="font-size: 1.4rem;">💰</span>
+                    <h4>TABA Funding Preferences</h4>
+                </div>
+                
+                <div class="taba-filter-options">
+                    <label class="taba-filter-option" for="taba-explicit">
+                        <input type="checkbox" id="taba-explicit" name="taba-filter" value="explicit">
+                        <span class="taba-icon">🎯</span>
+                        <span>Explicit TABA</span>
+                    </label>
+                    <label class="taba-filter-option" for="taba-likely">
+                        <input type="checkbox" id="taba-likely" name="taba-filter" value="likely">
+                        <span class="taba-icon">🔍</span>
+                        <span>Likely TABA</span>
+                    </label>
+                    <label class="taba-filter-option" for="taba-commercialization">
+                        <input type="checkbox" id="taba-commercialization" name="taba-filter" value="commercialization">
+                        <span class="taba-icon">📈</span>
+                        <span>Commercialization Focus</span>
+                    </label>
+                    <label class="taba-filter-option" for="taba-eligible">
+                        <input type="checkbox" id="taba-eligible" name="taba-filter" value="eligible">
+                        <span class="taba-icon">✅</span>
+                        <span>TABA Eligible</span>
+                    </label>
+                </div>
+            </div>
+
             <!-- Enhanced Smart Search Input -->
             <div class="smart-search-container">
                 <div class="search-label-container">
@@ -972,7 +1288,7 @@
                         type="text" 
                         class="search-input" 
                         id="search-input"
-                        placeholder="Optional: Add specific terms like 'CRISPR screening', 'high-throughput', 'machine learning'..."
+                        placeholder="Optional: Add specific terms like 'CRISPR screening', 'TABA funding', 'commercialization'..."
                     >
                 </div>
                 
@@ -986,20 +1302,20 @@
             <form class="search-form" id="search-form">
                 <div style="flex: 1;">
                     <button type="submit" class="search-btn" id="search-btn" disabled>
-                        🔍 Find BioTools Grants
+                        🔍 Find BioTools Grants with TABA
                     </button>
                 </div>
             </form>
 
             <!-- Example Searches -->
             <div class="example-searches">
-                <h4>💡 Example BioTools Searches:</h4>
-                <span class="example-item" onclick="loadExample('CRISPR screening platform')">CRISPR screening platform</span>
-                <span class="example-item" onclick="loadExample('single cell sequencing workflow')">single cell sequencing workflow</span>
-                <span class="example-item" onclick="loadExample('proteomics mass spectrometry')">proteomics mass spectrometry</span>
-                <span class="example-item" onclick="loadExample('microfluidics cell sorting')">microfluidics cell sorting</span>
-                <span class="example-item" onclick="loadExample('bioinformatics pipeline software')">bioinformatics pipeline software</span>
-                <span class="example-item" onclick="loadExample('spatial transcriptomics platform')">spatial transcriptomics platform</span>
+                <h4>💡 Example BioTools + TABA Searches:</h4>
+                <span class="example-item" onclick="loadExample('CRISPR screening TABA')">CRISPR screening TABA</span>
+                <span class="example-item" onclick="loadExample('single cell commercialization')">single cell commercialization</span>
+                <span class="example-item" onclick="loadExample('proteomics business assistance')">proteomics business assistance</span>
+                <span class="example-item" onclick="loadExample('microfluidics technical assistance')">microfluidics technical assistance</span>
+                <span class="example-item" onclick="loadExample('bioinformatics IP protection')">bioinformatics IP protection</span>
+                <span class="example-item" onclick="loadExample('spatial transcriptomics TABA')">spatial transcriptomics TABA</span>
             </div>
         </div>
 
@@ -1007,7 +1323,7 @@
         <div class="results-section" id="results-section">
             <div class="loading-spinner" id="loading-spinner">
                 <div class="spinner"></div>
-                <p>Searching for relevant BioTools grants...</p>
+                <p>Searching for relevant BioTools grants with TABA tracking...</p>
             </div>
             
             <div class="results-content" id="results-content" style="display: none;">
@@ -1029,9 +1345,10 @@
     </div>
 
     <script>
-        // Enhanced JavaScript with advanced features
+        // Enhanced JavaScript with TABA functionality
         let selectedToolTypes = new Set();
         let selectedFocusAreas = new Set();
+        let selectedTabaFilters = new Set();
         let currentDataType = 'all';
         let currentResults = [];
         let statsData = {};
@@ -1040,6 +1357,7 @@
         window.addEventListener('load', async () => {
             await loadStats();
             setupTaxonomyHandlers();
+            setupTabaFilterHandlers();
             setupSearchInput();
             setupDataTypeHandlers();
             updateSearchButton();
@@ -1054,7 +1372,7 @@
                 
                 document.getElementById('total-grants').textContent = data.total_grants?.toLocaleString() || '--';
                 document.getElementById('biotools-relevant').textContent = data.biotools_relevant_count?.toLocaleString() || '--';
-                document.getElementById('open-solicitations').textContent = data.open_solicitations?.toLocaleString() || '--';
+                document.getElementById('taba-grants').textContent = data.total_taba_grants?.toLocaleString() || '--';
                 document.getElementById('precision-rate').textContent = data.biotools_relevance_percentage + '%' || '--%';
                 
                 // Update data type counts
@@ -1107,6 +1425,27 @@
             });
         }
 
+        function setupTabaFilterHandlers() {
+            const tabaFilters = document.querySelectorAll('input[name="taba-filter"]');
+            
+            tabaFilters.forEach(filter => {
+                filter.addEventListener('change', function() {
+                    const filterOption = this.closest('.taba-filter-option');
+                    
+                    if (this.checked) {
+                        selectedTabaFilters.add(this.value);
+                        filterOption.classList.add('selected');
+                    } else {
+                        selectedTabaFilters.delete(this.value);
+                        filterOption.classList.remove('selected');
+                    }
+                    
+                    updateSearchButton();
+                    updateContextValidation();
+                });
+            });
+        }
+
         function toggleTaxonomyTag(element, selectedSet) {
             const value = element.dataset.value;
             
@@ -1143,12 +1482,16 @@
             const searchInput = document.getElementById('search-input');
             const validation = document.getElementById('context-validation');
             const query = searchInput.value.toLowerCase();
-
+            
             const hasSelections = selectedToolTypes.size > 0 && selectedFocusAreas.size > 0;
-
+            const hasTabaFilters = selectedTabaFilters.size > 0;
+            
             if (!hasSelections) {
                 validation.className = 'context-validation warning';
                 validation.innerHTML = '<span class="validation-icon">⚠️</span><span class="validation-text">Select at least one Tool Type and Focus Area to enable search</span>';
+            } else if (hasTabaFilters) {
+                validation.className = 'context-validation valid';
+                validation.innerHTML = '<span class="validation-icon">💰</span><span class="validation-text">Ready to search with TABA filtering</span>';
             } else if (query.length === 0) {
                 validation.className = 'context-validation valid';
                 validation.innerHTML = '<span class="validation-icon">✓</span><span class="validation-text">Ready to browse selected categories</span>';
@@ -1162,11 +1505,14 @@
             const searchBtn = document.getElementById('search-btn');
             const hasMinimumSelection = selectedToolTypes.size > 0 && selectedFocusAreas.size > 0;
             const searchText = document.getElementById('search-input').value.trim();
+            const hasTabaFilters = selectedTabaFilters.size > 0;
             
             if (hasMinimumSelection) {
                 searchBtn.disabled = false;
                 
-                if (searchText) {
+                if (hasTabaFilters) {
+                    searchBtn.textContent = '🔍 Search with TABA Filters';
+                } else if (searchText) {
                     searchBtn.textContent = '🔍 Search with Descriptors';
                 } else {
                     searchBtn.textContent = '🔍 Browse Categories';
@@ -1224,7 +1570,7 @@
         function loadExample(exampleText) {
             document.getElementById('search-input').value = exampleText;
             
-            // Auto-select relevant taxonomy based on example
+            // Auto-select relevant taxonomy and TABA filters based on example
             if (exampleText.includes('CRISPR') || exampleText.includes('sequencing')) {
                 autoSelectTaxonomy(['instrument', 'software'], ['genomics']);
             } else if (exampleText.includes('single cell')) {
@@ -1237,6 +1583,15 @@
                 autoSelectTaxonomy(['software'], ['bioinformatics']);
             } else if (exampleText.includes('spatial')) {
                 autoSelectTaxonomy(['instrument', 'software'], ['spatial_biology']);
+            }
+            
+            // Auto-select TABA filters based on keywords
+            if (exampleText.includes('TABA')) {
+                autoSelectTabaFilter('explicit');
+            } else if (exampleText.includes('commercialization')) {
+                autoSelectTabaFilter('commercialization');
+            } else if (exampleText.includes('business assistance') || exampleText.includes('technical assistance')) {
+                autoSelectTabaFilter('likely');
             }
             
             updateContextValidation();
@@ -1266,13 +1621,32 @@
             });
         }
 
-        // Handle form submission
+        function autoSelectTabaFilter(filterType) {
+            // Clear current TABA filters
+            selectedTabaFilters.clear();
+            document.querySelectorAll('.taba-filter-option.selected').forEach(option => {
+                option.classList.remove('selected');
+                const checkbox = option.querySelector('input[type="checkbox"]');
+                if (checkbox) checkbox.checked = false;
+            });
+            
+            // Select suggested filter
+            selectedTabaFilters.add(filterType);
+            const filterInput = document.getElementById(`taba-${filterType}`);
+            if (filterInput) {
+                filterInput.checked = true;
+                filterInput.closest('.taba-filter-option').classList.add('selected');
+            }
+        }
+
+        // Handle form submission with TABA filters
         document.getElementById('search-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const query = document.getElementById('search-input').value.trim();
             const toolTypes = Array.from(selectedToolTypes);
             const focusAreas = Array.from(selectedFocusAreas);
+            const tabaFilters = Array.from(selectedTabaFilters);
             
             if (toolTypes.length === 0 || focusAreas.length === 0) {
                 return;
@@ -1284,6 +1658,7 @@
                 data_type: currentDataType,
                 tool_types: toolTypes,
                 focus_areas: focusAreas,
+                taba_filters: tabaFilters,
                 biotools_validated: true,
                 browse_mode: query.length === 0
             };
@@ -1334,7 +1709,11 @@
             
             // Update results header
             document.getElementById('results-title').textContent = `Search Results: ${query}`;
-            document.getElementById('results-meta').textContent = `Found ${results.length} relevant ${dataType === 'all' ? 'grants' : dataType}`;
+            
+            // Count TABA results
+            const tabaCount = results.filter(r => r.has_taba_funding).length;
+            document.getElementById('results-meta').textContent = 
+                `Found ${results.length} relevant ${dataType === 'all' ? 'grants' : dataType} (${tabaCount} with TABA funding)`;
             
             // Update filter chips
             updateFilterChips(results);
@@ -1384,19 +1763,67 @@
                 chip.textContent = area.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
                 filtersContainer.appendChild(chip);
             });
+            
+            // TABA filter chips
+            selectedTabaFilters.forEach(filter => {
+                const chip = document.createElement('div');
+                chip.className = 'filter-chip';
+                chip.style.background = '#28a745';
+                chip.style.color = 'white';
+                chip.textContent = `💰 ${filter.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+                filtersContainer.appendChild(chip);
+            });
         }
 
         function createResultCard(result) {
             const card = document.createElement('div');
             card.className = 'result-card';
             
+            // Add TABA styling if has TABA funding
+            if (result.has_taba_funding) {
+                card.classList.add('has-taba');
+            }
+            
             const score = Math.round(result.relevance_score * 10) / 10;
             const scoreClass = score >= 8 ? 'excellent' : score >= 6 ? 'good' : 'moderate';
+            
+            // Generate TABA status badge
+            let tabaStatusHtml = '';
+            if (result.has_taba_funding) {
+                const tabaType = result.taba_type || 'unknown';
+                const tabaAmount = result.taba_amount || 0;
+                const tabaIcon = getTabaIcon(tabaType);
+                
+                tabaStatusHtml = `
+                    <div class="taba-status ${tabaType} tooltip" data-tooltip="TABA Confidence: ${(result.taba_confidence_score || 0).toFixed(1)}/10">
+                        <span class="taba-icon">${tabaIcon}</span>
+                        <span>TABA ${tabaType.toUpperCase()}</span>
+                        ${tabaAmount > 0 ? `<span class="taba-amount">${tabaAmount.toLocaleString()}</span>` : ''}
+                    </div>
+                `;
+            } else if (result.taba_eligible) {
+                tabaStatusHtml = `
+                    <div class="taba-status eligible tooltip" data-tooltip="Agency offers TABA funding for this type of project">
+                        <span class="taba-icon">✅</span>
+                        <span>TABA ELIGIBLE</span>
+                    </div>
+                `;
+            } else {
+                tabaStatusHtml = `
+                    <div class="taba-status not-eligible tooltip" data-tooltip="Agency does not offer TABA funding">
+                        <span class="taba-icon">❌</span>
+                        <span>NO TABA</span>
+                    </div>
+                `;
+            }
             
             card.innerHTML = `
                 <div class="result-header">
                     <h3 class="result-title">${escapeHtml(result.display_title || result.title || 'Untitled')}</h3>
-                    <div class="result-score ${scoreClass}">${score}</div>
+                    <div class="result-badges">
+                        <div class="result-score ${scoreClass}">${score}</div>
+                        ${tabaStatusHtml}
+                    </div>
                 </div>
                 
                 <div class="result-meta">
@@ -1434,6 +1861,7 @@
                     ${result.biotools_category ? result.biotools_category.split(',').map(cat => 
                         `<span class="result-tag biotools">${escapeHtml(cat.trim())}</span>`
                     ).join('') : ''}
+                    ${result.has_taba_funding ? `<span class="result-tag taba">💰 TABA Funded</span>` : ''}
                     ${result.program ? `<span class="result-tag">${escapeHtml(result.program)}</span>` : ''}
                     ${result.inferred_type ? `<span class="result-tag">${escapeHtml(result.inferred_type)}</span>` : ''}
                 </div>
@@ -1441,11 +1869,26 @@
                 <div class="result-actions">
                     <button class="action-btn" onclick="bookmarkGrant(${result.id})">🔖 Bookmark</button>
                     <button class="action-btn" onclick="shareGrant(${result.id})">🔗 Share</button>
+                    ${result.has_taba_funding ? `
+                        <button class="action-btn" onclick="exportTabaInfo(${result.id})" style="background: #28a745; color: white;">
+                            💰 TABA Details
+                        </button>
+                    ` : ''}
                     <a href="/grant/${result.id}" class="action-btn primary">📋 View Details</a>
                 </div>
             `;
             
             return card;
+        }
+
+        function getTabaIcon(tabaType) {
+            switch (tabaType) {
+                case 'explicit': return '🎯';
+                case 'likely': return '🔍';
+                case 'commercialization': return '📈';
+                case 'eligible': return '✅';
+                default: return '💰';
+            }
         }
 
         function escapeHtml(text) {
@@ -1473,27 +1916,29 @@
         }
 
         function bookmarkGrant(grantId) {
-            // Implementation for bookmarking
             console.log('Bookmarking grant:', grantId);
-            // You could store bookmarks in localStorage or send to server
             alert('Grant bookmarked! (Feature to be implemented)');
         }
 
         function shareGrant(grantId) {
-            // Implementation for sharing
             const url = `${window.location.origin}/grant/${grantId}`;
             
             if (navigator.share) {
                 navigator.share({
-                    title: 'BioTools Grant',
+                    title: 'BioTools Grant with TABA',
                     url: url
                 });
             } else {
-                // Fallback to clipboard
                 navigator.clipboard.writeText(url).then(() => {
                     alert('Grant link copied to clipboard!');
                 });
             }
+        }
+
+        function exportTabaInfo(grantId) {
+            // This would export detailed TABA information
+            console.log('Exporting TABA info for grant:', grantId);
+            alert('TABA information export feature coming soon!');
         }
 
         function showError(message) {
@@ -1510,65 +1955,12 @@
             `;
         }
 
-        // Advanced features
-        function exportResults() {
-            if (currentResults.length === 0) {
-                alert('No results to export');
-                return;
-            }
-            
-            const csv = convertToCSV(currentResults);
-            downloadCSV(csv, 'biotools_grants.csv');
-        }
-
-        function convertToCSV(results) {
-            const headers = ['Title', 'Agency', 'Amount', 'Phase', 'Description', 'Categories'];
-            const rows = results.map(result => [
-                result.title || '',
-                result.agency || '',
-                result.amount || '',
-                result.phase || '',
-                (result.description || '').replace(/,/g, ';'),
-                result.biotools_category || ''
-            ]);
-            
-            return [headers, ...rows].map(row => 
-                row.map(cell => `"${cell}"`).join(',')
-            ).join('\n');
-        }
-
-        function downloadCSV(csv, filename) {
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        }
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + Enter to search
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                e.preventDefault();
-                document.getElementById('search-form').dispatchEvent(new Event('submit'));
-            }
-            
-            // Escape to clear search
-            if (e.key === 'Escape') {
-                document.getElementById('search-input').value = '';
-                updateContextValidation();
-            }
-        });
-
-        // Auto-save search preferences
+        // Auto-save search preferences with TABA
         function saveSearchPreferences() {
             const preferences = {
                 selectedToolTypes: Array.from(selectedToolTypes),
                 selectedFocusAreas: Array.from(selectedFocusAreas),
+                selectedTabaFilters: Array.from(selectedTabaFilters),
                 currentDataType: currentDataType
             };
             
@@ -1591,6 +1983,16 @@
                         selectedFocusAreas.add(area);
                         const element = document.querySelector(`#focus-areas [data-value="${area}"]`);
                         if (element) element.classList.add('selected');
+                    });
+                    
+                    // Restore TABA filters
+                    preferences.selectedTabaFilters?.forEach(filter => {
+                        selectedTabaFilters.add(filter);
+                        const filterInput = document.getElementById(`taba-${filter}`);
+                        if (filterInput) {
+                            filterInput.checked = true;
+                            filterInput.closest('.taba-filter-option').classList.add('selected');
+                        }
                     });
                     
                     // Restore data type
@@ -1616,7 +2018,7 @@
         // Save preferences on changes
         document.addEventListener('change', saveSearchPreferences);
         document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('taxonomy-tag')) {
+            if (e.target.classList.contains('taxonomy-tag') || e.target.classList.contains('taba-filter-option')) {
                 setTimeout(saveSearchPreferences, 100);
             }
         });
@@ -1624,6 +2026,115 @@
         // Load preferences on startup
         window.addEventListener('load', () => {
             setTimeout(loadSearchPreferences, 500);
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd + Enter to search
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('search-form').dispatchEvent(new Event('submit'));
+            }
+            
+            // Escape to clear search
+            if (e.key === 'Escape') {
+                document.getElementById('search-input').value = '';
+                updateContextValidation();
+            }
+        });
+
+        // Export functionality enhancement
+        function exportResultsWithTaba() {
+            if (currentResults.length === 0) {
+                alert('No results to export');
+                return;
+            }
+            
+            const csv = convertToCSVWithTaba(currentResults);
+            downloadCSV(csv, 'biotools_grants_with_taba.csv');
+        }
+
+        function convertToCSVWithTaba(results) {
+            const headers = [
+                'Title', 'Agency', 'Amount', 'Phase', 'Description', 'Categories',
+                'Has_TABA', 'TABA_Type', 'TABA_Amount', 'TABA_Confidence', 'TABA_Keywords'
+            ];
+            const rows = results.map(result => [
+                result.title || '',
+                result.agency || '',
+                result.amount || '',
+                result.phase || '',
+                (result.description || '').replace(/,/g, ';'),
+                result.biotools_category || '',
+                result.has_taba_funding ? 'Yes' : 'No',
+                result.taba_type || '',
+                result.taba_amount || '',
+                result.taba_confidence_score || '',
+                result.taba_keywords_matched || ''
+            ]);
+            
+            return [headers, ...rows].map(row => 
+                row.map(cell => `"${cell}"`).join(',')
+            ).join('\n');
+        }
+
+        function downloadCSV(csv, filename) {
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Real-time TABA statistics
+        function updateTabaStatistics() {
+            if (currentResults.length > 0) {
+                const tabaResults = currentResults.filter(r => r.has_taba_funding);
+                const tabaPercent = (tabaResults.length / currentResults.length * 100).toFixed(1);
+                
+                // Update stats display
+                console.log(`Current results: ${tabaResults.length}/${currentResults.length} (${tabaPercent}%) have TABA funding`);
+            }
+        }
+
+        // TABA education modal (future enhancement)
+        function showTabaEducation() {
+            alert('TABA Education: Technical and Business Assistance provides up to $6,500 for Phase I and $50,000 for Phase II to help with commercialization activities like IP protection, market research, and business planning.');
+        }
+
+        // Advanced filtering functions
+        function filterResultsByTaba(results, tabaFilter) {
+            switch (tabaFilter) {
+                case 'explicit':
+                    return results.filter(r => r.has_taba_funding && r.taba_type === 'explicit');
+                case 'likely':
+                    return results.filter(r => r.has_taba_funding && r.taba_type === 'likely');
+                case 'commercialization':
+                    return results.filter(r => r.has_taba_funding && r.taba_type === 'commercialization');
+                case 'eligible':
+                    return results.filter(r => r.taba_eligible);
+                default:
+                    return results;
+            }
+        }
+
+        // Initialize advanced features on DOM ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add TABA education button
+            const tabaHeader = document.querySelector('.taba-header');
+            if (tabaHeader) {
+                const educationBtn = document.createElement('button');
+                educationBtn.innerHTML = '❓';
+                educationBtn.className = 'control-btn';
+                educationBtn.style.marginLeft = 'auto';
+                educationBtn.onclick = showTabaEducation;
+                educationBtn.title = 'Learn more about TABA funding';
+                tabaHeader.appendChild(educationBtn);
+            }
         });
     </script>
 </body>
