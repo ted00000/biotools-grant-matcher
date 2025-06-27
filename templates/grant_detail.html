@@ -20,7 +20,7 @@
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -171,6 +171,39 @@
             font-size: 1rem;
         }
 
+        .contact-quality-indicator {
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .contact-excellent {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .contact-good {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .contact-basic {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .contact-minimal {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
         .grant-details-grid {
             display: grid;
             grid-template-columns: 2fr 1fr;
@@ -208,6 +241,7 @@
             line-height: 1.7;
             color: #495057;
             margin-bottom: 20px;
+            white-space: pre-wrap; /* Preserve formatting and line breaks */
         }
 
         .detail-item {
@@ -230,6 +264,70 @@
         .detail-value {
             color: #495057;
             font-size: 1rem;
+        }
+
+        .contact-section {
+            background: linear-gradient(135deg, #e8f4fd 0%, #d1ecf1 100%);
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+        }
+
+        .contact-icon {
+            font-size: 1.2rem;
+            color: #667eea;
+            min-width: 20px;
+        }
+
+        .contact-text {
+            flex: 1;
+            font-size: 0.95rem;
+        }
+
+        .contact-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .contact-link:hover {
+            text-decoration: underline;
+        }
+
+        .company-section {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .company-classification {
+            display: inline-block;
+            background: #28a745;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin: 2px 4px 2px 0;
+        }
+
+        .address-text {
+            white-space: pre-line;
+            font-size: 0.95rem;
+            line-height: 1.5;
         }
 
         .tags-container {
@@ -300,6 +398,15 @@
         .action-btn.primary:hover {
             background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
             border-color: #5a6fd8;
+        }
+
+        .no-contact-message {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            color: #6c757d;
+            font-style: italic;
         }
 
         .error-message {
@@ -404,7 +511,7 @@
     <div class="container">
         <div class="header">
             <h1>🧬 Grant Details</h1>
-            <p>Detailed information about this funding opportunity</p>
+            <p>Comprehensive funding information with contact details</p>
         </div>
 
         <div class="navigation">
@@ -505,6 +612,12 @@
                                 🎯 ${grant.biotools_relevance.toFixed(1)}/10 BioTools Match
                             </div>
                         ` : ''}
+
+                        ${grant.contact_quality_level ? `
+                            <div class="contact-quality-indicator contact-${grant.contact_quality_level}">
+                                📞 ${grant.contact_quality_level} Contact Info
+                            </div>
+                        ` : ''}
                     </div>
 
                     ${grant.display_subtitle ? `
@@ -550,24 +663,160 @@
                     </div>
 
                     <div class="sidebar-details">
+                        <!-- Company Information Section -->
+                        ${grant.display_company ? `
+                            <div class="company-section">
+                                <div class="section-title">
+                                    <span class="section-icon">🏢</span>
+                                    Company Information
+                                </div>
+
+                                <div style="margin-bottom: 15px;">
+                                    <div style="font-weight: 600; font-size: 1.1rem; color: #2c3e50; margin-bottom: 8px;">
+                                        ${escapeHtml(grant.display_company)}
+                                    </div>
+                                    
+                                    ${grant.company_url ? `
+                                        <div style="margin-bottom: 8px;">
+                                            <span class="contact-icon">🌐</span>
+                                            <a href="${escapeHtml(grant.company_url)}" target="_blank" class="contact-link">
+                                                ${escapeHtml(grant.company_url)}
+                                            </a>
+                                        </div>
+                                    ` : ''}
+
+                                    ${grant.formatted_address && grant.formatted_address !== 'N/A' ? `
+                                        <div style="margin-bottom: 8px;">
+                                            <span class="contact-icon">📍</span>
+                                            <span class="address-text">${escapeHtml(grant.formatted_address)}</span>
+                                        </div>
+                                    ` : ''}
+
+                                    ${grant.award_history_text ? `
+                                        <div style="margin-bottom: 8px; color: #6c757d; font-size: 0.9rem;">
+                                            <span class="contact-icon">🏆</span>
+                                            ${escapeHtml(grant.award_history_text)}
+                                        </div>
+                                    ` : ''}
+
+                                    ${grant.company_classifications && grant.company_classifications.length > 0 ? `
+                                        <div style="margin-top: 10px;">
+                                            ${grant.company_classifications.map(classification => 
+                                                `<span class="company-classification">${escapeHtml(classification)}</span>`
+                                            ).join('')}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <!-- Contact Information Section -->
+                        ${grant.has_any_contact ? `
+                            <div class="contact-section">
+                                <div class="section-title">
+                                    <span class="section-icon">📞</span>
+                                    Contact Information
+                                </div>
+
+                                ${grant.poc_name || grant.poc_email || grant.poc_phone ? `
+                                    <div style="margin-bottom: 15px;">
+                                        <div style="font-weight: 600; margin-bottom: 8px; color: #2c3e50;">Point of Contact</div>
+                                        
+                                        ${grant.poc_name ? `
+                                            <div class="contact-item">
+                                                <span class="contact-icon">👤</span>
+                                                <span class="contact-text">
+                                                    ${escapeHtml(grant.poc_name)}
+                                                    ${grant.poc_title ? ` (${escapeHtml(grant.poc_title)})` : ''}
+                                                </span>
+                                            </div>
+                                        ` : ''}
+
+                                        ${grant.poc_email ? `
+                                            <div class="contact-item">
+                                                <span class="contact-icon">✉️</span>
+                                                <a href="mailto:${escapeHtml(grant.poc_email)}" class="contact-link">
+                                                    ${escapeHtml(grant.poc_email)}
+                                                </a>
+                                            </div>
+                                        ` : ''}
+
+                                        ${grant.poc_phone ? `
+                                            <div class="contact-item">
+                                                <span class="contact-icon">📞</span>
+                                                <a href="tel:${escapeHtml(grant.poc_phone)}" class="contact-link">
+                                                    ${escapeHtml(grant.poc_phone)}
+                                                </a>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                ` : ''}
+
+                                ${grant.principal_investigator || grant.pi_email || grant.pi_phone ? `
+                                    <div style="margin-bottom: 15px;">
+                                        <div style="font-weight: 600; margin-bottom: 8px; color: #2c3e50;">Principal Investigator</div>
+                                        
+                                        ${grant.principal_investigator ? `
+                                            <div class="contact-item">
+                                                <span class="contact-icon">🔬</span>
+                                                <span class="contact-text">${escapeHtml(grant.principal_investigator)}</span>
+                                            </div>
+                                        ` : ''}
+
+                                        ${grant.pi_email ? `
+                                            <div class="contact-item">
+                                                <span class="contact-icon">✉️</span>
+                                                <a href="mailto:${escapeHtml(grant.pi_email)}" class="contact-link">
+                                                    ${escapeHtml(grant.pi_email)}
+                                                </a>
+                                            </div>
+                                        ` : ''}
+
+                                        ${grant.pi_phone ? `
+                                            <div class="contact-item">
+                                                <span class="contact-icon">📞</span>
+                                                <a href="tel:${escapeHtml(grant.pi_phone)}" class="contact-link">
+                                                    ${escapeHtml(grant.pi_phone)}
+                                                </a>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                ` : ''}
+
+                                ${grant.ri_poc_name || grant.ri_poc_phone ? `
+                                    <div>
+                                        <div style="font-weight: 600; margin-bottom: 8px; color: #2c3e50;">Research Institution Contact</div>
+                                        
+                                        ${grant.ri_poc_name ? `
+                                            <div class="contact-item">
+                                                <span class="contact-icon">🏫</span>
+                                                <span class="contact-text">${escapeHtml(grant.ri_poc_name)}</span>
+                                            </div>
+                                        ` : ''}
+
+                                        ${grant.ri_poc_phone ? `
+                                            <div class="contact-item">
+                                                <span class="contact-icon">📞</span>
+                                                <a href="tel:${escapeHtml(grant.ri_poc_phone)}" class="contact-link">
+                                                    ${escapeHtml(grant.ri_poc_phone)}
+                                                </a>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        ` : `
+                            <div class="no-contact-message">
+                                <span class="section-icon">📞</span>
+                                <p>No contact information available for this grant.</p>
+                            </div>
+                        `}
+
+                        <!-- Grant Information Section -->
                         <div class="section-title">
                             <span class="section-icon">ℹ️</span>
                             Grant Information
                         </div>
-
-                        ${grant.display_company ? `
-                            <div class="detail-item">
-                                <div class="detail-label">Company/Organization</div>
-                                <div class="detail-value">${escapeHtml(grant.display_company)}</div>
-                            </div>
-                        ` : ''}
-
-                        ${grant.principal_investigator ? `
-                            <div class="detail-item">
-                                <div class="detail-label">Principal Investigator</div>
-                                <div class="detail-value">${escapeHtml(grant.principal_investigator)}</div>
-                            </div>
-                        ` : ''}
 
                         ${grant.formatted_amount && grant.formatted_amount !== 'N/A' ? `
                             <div class="detail-item">
@@ -620,6 +869,20 @@
                             </div>
                         ` : ''}
 
+                        ${grant.uei ? `
+                            <div class="detail-item">
+                                <div class="detail-label">UEI</div>
+                                <div class="detail-value">${escapeHtml(grant.uei)}</div>
+                            </div>
+                        ` : ''}
+
+                        ${grant.duns ? `
+                            <div class="detail-item">
+                                <div class="detail-label">DUNS</div>
+                                <div class="detail-value">${escapeHtml(grant.duns)}</div>
+                            </div>
+                        ` : ''}
+
                         ${grant.keywords ? `
                             <div class="detail-item">
                                 <div class="detail-label">Keywords</div>
@@ -644,6 +907,13 @@
                         <span>📄</span>
                         Export Details
                     </button>
+                    
+                    ${grant.has_any_contact ? `
+                        <button class="action-btn" onclick="exportContactInfo()">
+                            <span>📞</span>
+                            Export Contacts
+                        </button>
+                    ` : ''}
                     
                     <button class="action-btn primary" onclick="provideFeedback(${grant.id})">
                         <span>💬</span>
@@ -681,19 +951,67 @@
             return div.innerHTML;
         }
 
-        // Action functions
+        // Enhanced action functions
+        function exportContactInfo() {
+            const contactData = extractContactData();
+            const contactText = createContactExportText(contactData);
+            
+            const blob = new Blob([contactText], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'grant_contacts.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            showNotification('Contact information exported successfully!', 'success');
+        }
+
+        function extractContactData() {
+            const grantTitle = document.querySelector('.grant-title')?.textContent || 'Grant';
+            const contacts = [];
+            
+            // Extract contact information from the page
+            document.querySelectorAll('.contact-item').forEach(item => {
+                const text = item.textContent.trim();
+                const link = item.querySelector('a');
+                if (link) {
+                    contacts.push(`${text} (${link.href})`);
+                } else {
+                    contacts.push(text);
+                }
+            });
+            
+            return {
+                title: grantTitle,
+                contacts: contacts
+            };
+        }
+
+        function createContactExportText(data) {
+            return `
+GRANT CONTACT INFORMATION
+========================
+
+Grant: ${data.title}
+
+Contact Details:
+${data.contacts.join('\n')}
+
+Exported from BioTools Grant Matcher Pro
+${new Date().toLocaleString()}
+            `.trim();
+        }
+
         function bookmarkGrant(grantId) {
-            // Store bookmark in localStorage
             let bookmarks = JSON.parse(localStorage.getItem('biotoolsBookmarks') || '[]');
             
             if (!bookmarks.includes(grantId)) {
                 bookmarks.push(grantId);
                 localStorage.setItem('biotoolsBookmarks', JSON.stringify(bookmarks));
-                
-                // Provide feedback to user
                 showNotification('Grant bookmarked successfully!', 'success');
-                
-                // Send feedback to server
                 submitFeedback(grantId, 'bookmarked');
             } else {
                 showNotification('Grant is already bookmarked', 'info');
@@ -711,11 +1029,9 @@
                     url: url
                 }).catch(console.error);
             } else {
-                // Fallback to clipboard
                 navigator.clipboard.writeText(url).then(() => {
                     showNotification('Grant link copied to clipboard!', 'success');
                 }).catch(() => {
-                    // Ultimate fallback - show URL in a prompt
                     prompt('Copy this URL to share:', url);
                 });
             }
@@ -723,12 +1039,8 @@
 
         function exportGrantDetails() {
             const grantTitle = document.querySelector('.grant-title')?.textContent || 'Grant Details';
-            const grantContent = document.getElementById('grant-content');
-            
-            // Create a simplified text version for export
             const exportText = createExportText();
             
-            // Create and download file
             const blob = new Blob([exportText], { type: 'text/plain' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -746,7 +1058,6 @@
             const title = document.querySelector('.grant-title')?.textContent || 'Grant Details';
             const description = document.querySelector('.description-text')?.textContent || 'No description available';
             
-            // Extract key details
             const details = [];
             document.querySelectorAll('.detail-item').forEach(item => {
                 const label = item.querySelector('.detail-label')?.textContent;
@@ -754,6 +1065,11 @@
                 if (label && value) {
                     details.push(`${label}: ${value}`);
                 }
+            });
+
+            const contacts = [];
+            document.querySelectorAll('.contact-item').forEach(item => {
+                contacts.push(item.textContent.trim());
             });
             
             return `
@@ -767,6 +1083,9 @@ ${description}
 
 Grant Information:
 ${details.join('\n')}
+
+Contact Information:
+${contacts.join('\n')}
 
 Exported from BioTools Grant Matcher Pro
 ${new Date().toLocaleString()}
@@ -809,7 +1128,6 @@ ${new Date().toLocaleString()}
         }
 
         function showNotification(message, type = 'info') {
-            // Create notification element
             const notification = document.createElement('div');
             notification.style.cssText = `
                 position: fixed;
@@ -825,7 +1143,6 @@ ${new Date().toLocaleString()}
                 word-wrap: break-word;
             `;
             
-            // Set background color based on type
             switch (type) {
                 case 'success':
                     notification.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
@@ -844,7 +1161,6 @@ ${new Date().toLocaleString()}
             notification.textContent = message;
             document.body.appendChild(notification);
             
-            // Remove notification after 4 seconds
             setTimeout(() => {
                 notification.style.animation = 'slideOutRight 0.3s ease-out';
                 setTimeout(() => {
@@ -857,12 +1173,10 @@ ${new Date().toLocaleString()}
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            // Escape to go back
             if (e.key === 'Escape') {
                 window.history.back();
             }
             
-            // B to bookmark
             if (e.key === 'b' || e.key === 'B') {
                 if (!e.ctrlKey && !e.metaKey) {
                     e.preventDefault();
@@ -871,12 +1185,18 @@ ${new Date().toLocaleString()}
                 }
             }
             
-            // S to share
             if (e.key === 's' || e.key === 'S') {
                 if (!e.ctrlKey && !e.metaKey) {
                     e.preventDefault();
                     const grantId = parseInt(window.location.pathname.split('/').pop());
                     if (grantId) shareGrant(grantId);
+                }
+            }
+
+            if (e.key === 'c' || e.key === 'C') {
+                if (!e.ctrlKey && !e.metaKey) {
+                    e.preventDefault();
+                    exportContactInfo();
                 }
             }
         });

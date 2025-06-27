@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Complete Enhanced BioTools SBIR/STTR Scraper - Fixed Version
-All syntax errors resolved and fully functional
+Enhanced BioTools SBIR/STTR Scraper with Comprehensive Contact Information
+Captures company details, contact information, and PI data for better grant details
 """
 
 import requests
@@ -14,7 +14,7 @@ from typing import List, Dict, Any, Optional, Set
 import logging
 import re
 
-class CompleteBiotoolsScraper:
+class CompleteBiotoolsScraperWithContacts:
     def __init__(self, db_path="data/grants.db"):
         self.db_path = db_path
         self.base_url = "https://api.www.sbir.gov/public/api"
@@ -43,7 +43,7 @@ class CompleteBiotoolsScraper:
         self.logger = logging.getLogger(__name__)
         os.makedirs('logs', exist_ok=True)
         
-        # Correct agency mappings based on actual SBIR API structure
+        # Biotools agencies and programs (same as before)
         self.biotools_agencies = {
             'HHS': {
                 'programs': ['SBIR', 'STTR', 'biomedical', 'health technology', 'medical device', 
@@ -87,7 +87,7 @@ class CompleteBiotoolsScraper:
             }
         }
         
-        # Enhanced biotools keywords with compound validation
+        # Enhanced biotools keywords (same as before)
         self.biotools_keywords = {
             'instruments': [
                 'microscope', 'microscopy', 'spectrometer', 'spectrometry', 'sequencer', 'sequencing',
@@ -129,26 +129,6 @@ class CompleteBiotoolsScraper:
                 'drug discovery platforms', 'pharmaceutical research', 'biomarker discovery',
                 'clinical laboratory tools', 'diagnostic testing', 'therapeutic development',
                 'personalized medicine', 'precision medicine tools'
-            ],
-            'microfluidics': [
-                'microfluidic devices', 'lab-on-chip systems', 'droplet microfluidics', 
-                'biological microfluidics', 'cell manipulation', 'biological sample preparation',
-                'organ-on-chip', 'tissue-on-chip', 'microfluidic cell culture'
-            ],
-            'synthetic_biology': [
-                'synthetic biology tools', 'bioengineering platforms', 'biological engineering', 
-                'biosynthesis systems', 'metabolic engineering', 'protein engineering', 
-                'genetic engineering tools', 'biological circuits', 'biodesign'
-            ],
-            'multi_omics': [
-                'multi-omics integration', 'systems biology tools', 'integrative biology',
-                'personalized medicine', 'precision medicine', 'biomedical research tools',
-                'translational research', 'clinical translation', 'biomarker validation'
-            ],
-            'emerging': [
-                'organoid technology', 'tissue engineering', 'regenerative medicine tools',
-                'bioprinting', '3D cell culture', 'biomaterials', 'biocompatible materials',
-                'nanotechnology biology', 'biological nanosensors', 'biosensors'
             ]
         }
         
@@ -163,13 +143,16 @@ class CompleteBiotoolsScraper:
         ]
         
         self.init_database()
+        
+        # Company data cache for linking awards to companies
+        self.company_cache = {}
     
     def init_database(self):
-        """Initialize database with comprehensive schema"""
+        """Initialize database with comprehensive schema including contact information"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Create comprehensive grants table
+        # Create comprehensive grants table with contact information
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS grants (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -194,7 +177,54 @@ class CompleteBiotoolsScraper:
                 compound_keyword_matches TEXT,
                 agency_alignment_score REAL DEFAULT 0.0,
                 url TEXT,
+                
+                -- Contact Information
+                poc_name TEXT,
+                poc_title TEXT,
+                poc_phone TEXT,
+                poc_email TEXT,
+                pi_phone TEXT,
+                pi_email TEXT,
+                ri_poc_name TEXT,
+                ri_poc_phone TEXT,
+                
+                -- Company Information
+                company_name TEXT,
+                company_url TEXT,
+                address1 TEXT,
+                address2 TEXT,
+                city TEXT,
+                state TEXT,
+                zip_code TEXT,
+                uei TEXT,
+                duns TEXT,
+                number_awards INTEGER,
+                hubzone_owned TEXT,
+                socially_economically_disadvantaged TEXT,
+                woman_owned TEXT,
+                
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create companies table for comprehensive company data
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS companies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                uei TEXT UNIQUE,
+                company_name TEXT,
+                duns TEXT,
+                number_awards INTEGER,
+                address1 TEXT,
+                address2 TEXT,
+                city TEXT,
+                state TEXT,
+                zip_code TEXT,
+                company_url TEXT,
+                hubzone_owned TEXT,
+                socially_economically_disadvantaged TEXT,
+                woman_owned TEXT,
+                last_updated TEXT DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         
@@ -204,7 +234,11 @@ class CompleteBiotoolsScraper:
             "CREATE INDEX IF NOT EXISTS idx_grants_agency ON grants(agency)",
             "CREATE INDEX IF NOT EXISTS idx_grants_relevance ON grants(relevance_score)",
             "CREATE INDEX IF NOT EXISTS idx_grants_biotools_category ON grants(biotools_category)",
-            "CREATE INDEX IF NOT EXISTS idx_grants_confidence ON grants(confidence_score)"
+            "CREATE INDEX IF NOT EXISTS idx_grants_confidence ON grants(confidence_score)",
+            "CREATE INDEX IF NOT EXISTS idx_grants_company_name ON grants(company_name)",
+            "CREATE INDEX IF NOT EXISTS idx_grants_uei ON grants(uei)",
+            "CREATE INDEX IF NOT EXISTS idx_companies_uei ON companies(uei)",
+            "CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(company_name)"
         ]
         
         for index_sql in indexes:
@@ -212,10 +246,10 @@ class CompleteBiotoolsScraper:
         
         conn.commit()
         conn.close()
-        self.logger.info("Database initialized with comprehensive schema")
+        self.logger.info("Database initialized with comprehensive contact information schema")
 
     def calculate_biotools_relevance(self, title: str, abstract: str = "", program: str = "") -> tuple:
-        """Calculate comprehensive biotools relevance with confidence scoring - FIXED"""
+        """Calculate comprehensive biotools relevance with confidence scoring"""
         text = f"{title} {abstract} {program}".lower()
         
         # Exclude space/aerospace terms immediately
@@ -238,7 +272,7 @@ class CompleteBiotoolsScraper:
         for compound in biological_compounds:
             if compound.lower() in text:
                 compound_matches.append(compound)
-                relevance_score += 4.0  # Higher value for biological compounds
+                relevance_score += 4.0
                 confidence_score += 3.0
         
         # 2. Require explicit biological context for other terms
@@ -265,7 +299,7 @@ class CompleteBiotoolsScraper:
                         relevance_score += 2.0
                         confidence_score += 1.5
                     elif category in ['genomics', 'cell_biology', 'proteomics']:
-                        relevance_score += 3.0  # Higher for core biotools areas
+                        relevance_score += 3.0
                         confidence_score += 2.0
                     elif category in ['bioinformatics', 'lab_equipment']:
                         relevance_score += 1.5
@@ -299,14 +333,12 @@ class CompleteBiotoolsScraper:
     def is_biotools_relevant(self, title: str, abstract: str = "", program: str = "") -> bool:
         """Enhanced biotools relevance check"""
         relevance_score, confidence_score, _, _, _ = self.calculate_biotools_relevance(title, abstract, program)
-        
-        # More stringent criteria
         return relevance_score >= 1.5 and confidence_score >= 1.0
 
     def calculate_agency_alignment(self, agency: str, program: str, title: str, abstract: str) -> float:
         """Calculate how well the grant aligns with agency's biotools focus"""
         if agency not in self.biotools_agencies:
-            return 1.0  # Neutral for unknown agencies
+            return 1.0
         
         agency_config = self.biotools_agencies[agency]
         text = f"{program} {title} {abstract}".lower()
@@ -334,6 +366,8 @@ class CompleteBiotoolsScraper:
         """Enhanced API request with proper error handling"""
         if endpoint == "solicitations":
             url = "https://api.www.sbir.gov/public/api/solicitations"
+        elif endpoint == "firm":
+            url = "https://api.www.sbir.gov/public/api/firm"
         else:
             url = f"{self.base_url}/{endpoint}"
 
@@ -380,9 +414,83 @@ class CompleteBiotoolsScraper:
         self.logger.error("Max retries exceeded")
         return None
 
+    def fetch_company_data(self) -> Dict[str, Dict]:
+        """Fetch comprehensive company data and cache it"""
+        self.logger.info("Fetching comprehensive company data...")
+        
+        companies = {}
+        rows_per_request = 1000
+        start = 0
+        
+        while True:
+            params = {
+                'start': start,
+                'rows': rows_per_request,
+                'format': 'json'
+            }
+            
+            try:
+                data = self.make_api_request('firm', params)
+                
+                if not data or len(data) == 0:
+                    break
+                
+                for company in data:
+                    uei = company.get('uei')
+                    if uei:
+                        companies[uei] = company
+                        
+                        # Also index by company name for fallback matching
+                        company_name = company.get('company_name', '').strip()
+                        if company_name:
+                            companies[company_name.lower()] = company
+                
+                self.logger.info(f"Fetched {len(data)} companies (total cached: {len(companies)})")
+                
+                if len(data) < rows_per_request:
+                    break
+                    
+                start += rows_per_request
+                time.sleep(2)  # Rate limiting
+                
+            except Exception as e:
+                self.logger.error(f"Error fetching company data: {e}")
+                break
+        
+        self.company_cache = companies
+        self.logger.info(f"Company data cache built with {len(companies)} entries")
+        return companies
+
+    def get_company_info(self, firm_name: str = None, uei: str = None) -> Dict[str, Any]:
+        """Get company information from cache"""
+        if not self.company_cache:
+            self.fetch_company_data()
+        
+        # Try UEI first (most reliable)
+        if uei and uei in self.company_cache:
+            return self.company_cache[uei]
+        
+        # Fallback to company name matching
+        if firm_name:
+            firm_lower = firm_name.lower().strip()
+            if firm_lower in self.company_cache:
+                return self.company_cache[firm_lower]
+            
+            # Fuzzy matching for similar company names
+            for cached_name, company_data in self.company_cache.items():
+                if isinstance(cached_name, str) and len(cached_name) > 10:  # Skip UEI keys
+                    if firm_lower in cached_name or cached_name in firm_lower:
+                        return company_data
+        
+        return {}
+
     def fetch_enhanced_awards_by_agency(self, agency: str, start_year: int = 2022) -> List[Dict]:
-        """Enhanced award fetching with comprehensive filtering"""
-        self.logger.info(f"Fetching enhanced {agency} awards from {start_year}...")
+        """Enhanced award fetching with comprehensive contact and company information"""
+        self.logger.info(f"Fetching enhanced {agency} awards with contact info from {start_year}...")
+        
+        # Ensure company data is loaded
+        if not self.company_cache:
+            self.fetch_company_data()
         
         awards = []
         rows_per_request = 1000
@@ -420,18 +528,39 @@ class CompleteBiotoolsScraper:
                         relevance_score, confidence_score, categories, keywords, compounds = \
                             self.calculate_biotools_relevance(title, abstract, program)
                         
-                        if relevance_score >= 1.5:  # More stringent threshold
+                        if relevance_score >= 1.5:
                             # Calculate agency alignment
                             agency_alignment = self.calculate_agency_alignment(
                                 agency, program, title, abstract
                             )
                             
-                            # Enhanced award data
+                            # Get company information
+                            firm_name = award.get('firm', '')
+                            uei = award.get('uei', '')
+                            company_info = self.get_company_info(firm_name, uei)
+                            
+                            # Enhanced award data with contact information
                             award['relevance_score'] = relevance_score
                             award['confidence_score'] = confidence_score
                             award['biotools_category'] = ','.join(categories) if categories else ''
                             award['compound_keyword_matches'] = ','.join(compounds) if compounds else ''
                             award['agency_alignment_score'] = agency_alignment
+                            
+                            # Add company information to award
+                            if company_info:
+                                award['company_name'] = company_info.get('company_name', firm_name)
+                                award['company_url'] = company_info.get('company_url', '')
+                                award['address1'] = company_info.get('address1', '')
+                                award['address2'] = company_info.get('address2', '')
+                                award['city'] = company_info.get('city', '')
+                                award['state'] = company_info.get('state', '')
+                                award['zip_code'] = company_info.get('zip', '')
+                                award['uei'] = company_info.get('uei', uei)
+                                award['duns'] = company_info.get('duns', '')
+                                award['number_awards'] = company_info.get('number_awards', 0)
+                                award['hubzone_owned'] = company_info.get('hubzone_owned', '')
+                                award['socially_economically_disadvantaged'] = company_info.get('socially_economically_disadvantaged', '')
+                                award['woman_owned'] = company_info.get('woman_owned', '')
                             
                             awards.append(award)
                             year_biotools_count += 1
@@ -454,15 +583,205 @@ class CompleteBiotoolsScraper:
             relevance_rate = (year_biotools_count / year_total_count * 100) if year_total_count > 0 else 0
             self.logger.info(f"  {agency} {year}: {year_biotools_count}/{year_total_count} biotools-relevant ({relevance_rate:.1f}%)")
         
-        self.logger.info(f"✅ {agency}: Collected {len(awards)} enhanced biotools-relevant awards")
+        self.logger.info(f"✅ {agency}: Collected {len(awards)} enhanced biotools-relevant awards with contact info")
         return awards
+
+    def save_enhanced_awards(self, awards: List[Dict]) -> int:
+        """Save enhanced awards with comprehensive contact and company data"""
+        if not awards:
+            return 0
+        
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        saved_count = 0
+        
+        for award in awards:
+            try:
+                # Extract and clean enhanced data
+                title = award.get('award_title', '')[:500]
+                description = award.get('description', '')[:5000] if award.get('description') else ''  # Increased from 2000
+                abstract = award.get('abstract', '')[:5000] if award.get('abstract') else ''  # Increased from 2000
+                agency = award.get('agency', '')
+                program = award.get('program', '')
+                award_number = award.get('award_number', '')
+                firm = award.get('firm', '')
+                pi = award.get('principal_investigator', '')
+                
+                # Handle amount
+                amount = 0
+                if award.get('award_amount'):
+                    try:
+                        amount_str = str(award['award_amount']).replace(',', '').replace('$', '')
+                        amount = int(float(amount_str))
+                    except (ValueError, TypeError):
+                        amount = 0
+                
+                award_date = award.get('award_date', '')
+                end_date = award.get('end_date', '')
+                phase = award.get('phase', '')
+                keywords = award.get('keywords', '')
+                
+                # Enhanced scoring data
+                relevance_score = award.get('relevance_score', 0.0)
+                confidence_score = award.get('confidence_score', 0.0)
+                biotools_category = award.get('biotools_category', '')
+                compound_matches = award.get('compound_keyword_matches', '')
+                agency_alignment = award.get('agency_alignment_score', 0.0)
+                url = award.get('url', '')
+                
+                # Contact information
+                poc_name = award.get('poc_name', '')
+                poc_title = award.get('poc_title', '')
+                poc_phone = award.get('poc_phone', '')
+                poc_email = award.get('poc_email', '')
+                pi_phone = award.get('pi_phone', '')
+                pi_email = award.get('pi_email', '')
+                ri_poc_name = award.get('ri_poc_name', '')
+                ri_poc_phone = award.get('ri_poc_phone', '')
+                
+                # Company information
+                company_name = award.get('company_name', firm)
+                company_url = award.get('company_url', '')
+                address1 = award.get('address1', '')
+                address2 = award.get('address2', '')
+                city = award.get('city', '')
+                state = award.get('state', '')
+                zip_code = award.get('zip_code', '')
+                uei = award.get('uei', '')
+                duns = award.get('duns', '')
+                number_awards = award.get('number_awards', 0)
+                hubzone_owned = award.get('hubzone_owned', '')
+                socially_economically_disadvantaged = award.get('socially_economically_disadvantaged', '')
+                woman_owned = award.get('woman_owned', '')
+                
+                # Insert enhanced award with contact information
+                cursor.execute('''
+                    INSERT OR REPLACE INTO grants 
+                    (title, description, abstract, agency, program, award_number, firm, 
+                     principal_investigator, amount, award_date, end_date, phase, keywords, 
+                     source, grant_type, relevance_score, confidence_score, biotools_category,
+                     compound_keyword_matches, agency_alignment_score, url,
+                     poc_name, poc_title, poc_phone, poc_email, pi_phone, pi_email,
+                     ri_poc_name, ri_poc_phone, company_name, company_url, address1, address2,
+                     city, state, zip_code, uei, duns, number_awards, hubzone_owned,
+                     socially_economically_disadvantaged, woman_owned, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    title, description, abstract, agency, program, award_number, firm,
+                    pi, amount, award_date, end_date, phase, keywords,
+                    'SBIR', 'award', relevance_score, confidence_score, biotools_category,
+                    compound_matches, agency_alignment, url,
+                    poc_name, poc_title, poc_phone, poc_email, pi_phone, pi_email,
+                    ri_poc_name, ri_poc_phone, company_name, company_url, address1, address2,
+                    city, state, zip_code, uei, duns, number_awards, hubzone_owned,
+                    socially_economically_disadvantaged, woman_owned, datetime.now().isoformat()
+                ))
+                
+                saved_count += 1
+                
+            except Exception as e:
+                self.logger.error(f"Error saving award {award.get('award_number', 'unknown')}: {e}")
+                continue
+        
+        conn.commit()
+        conn.close()
+        
+        self.logger.info(f"💾 Saved {saved_count} enhanced awards with contact info to database")
+        return saved_count
+
+    def run_comprehensive_biotools_scraping(self, start_year: int = 2022) -> Dict[str, Any]:
+        """Run comprehensive biotools data collection with contact information"""
+        self.logger.info("🚀 Starting Comprehensive BioTools Data Collection with Contact Information")
+        self.logger.info("=" * 70)
+        
+        # Pre-load company data for faster processing
+        self.logger.info("📋 Pre-loading company data...")
+        self.fetch_company_data()
+        
+        before_stats = self.get_database_stats()
+        self.logger.info(f"📊 Before: {before_stats.get('total_grants', 0)} total grants, {before_stats.get('biotools_validated', 0)} biotools-validated")
+        
+        total_added = {
+            'awards': 0,
+            'solicitations': 0,
+            'successful_agencies': [],
+            'failed_agencies': [],
+            'precision_metrics': {}
+        }
+        
+        # 1. Enhanced Awards Collection with Contact Information
+        self.logger.info("\n" + "=" * 40)
+        self.logger.info("🏆 ENHANCED AWARD COLLECTION WITH CONTACTS")
+        
+        for agency in self.biotools_agencies.keys():
+            try:
+                self.logger.info(f"\nProcessing {agency} with enhanced contact filtering...")
+                awards = self.fetch_enhanced_awards_by_agency(agency, start_year)
+                saved = self.save_enhanced_awards(awards)
+                total_added['awards'] += saved
+                total_added['successful_agencies'].append(agency)
+                
+                # Inter-agency delay for API respect
+                time.sleep(5)
+                
+            except Exception as e:
+                self.logger.error(f"Failed to process {agency} awards: {e}")
+                total_added['failed_agencies'].append(agency)
+        
+        # 2. Enhanced Solicitations Collection (same as before but with contact fields ready)
+        self.logger.info("\n" + "=" * 40)
+        self.logger.info("📋 ENHANCED SOLICITATION COLLECTION")
+        self.logger.info("⏳ Waiting 10 seconds for API recovery...")
+        time.sleep(10)
+        
+        try:
+            solicitations = self.fetch_enhanced_solicitations()
+            saved = self.save_enhanced_solicitations(solicitations)
+            total_added['solicitations'] += saved
+            
+        except Exception as e:
+            self.logger.error(f"Failed to process solicitations: {e}")
+        
+        # 3. Quality Assessment
+        self.logger.info("\n" + "=" * 40)
+        self.logger.info("🎯 QUALITY ASSESSMENT WITH CONTACT DATA")
+        
+        after_stats = self.get_database_stats()
+        
+        # Calculate precision metrics
+        precision_metrics = {
+            'biotools_validated_rate': (after_stats.get('biotools_validated', 0) / max(after_stats.get('total_grants', 1), 1)) * 100,
+            'avg_relevance_score': after_stats.get('avg_relevance_score', 0),
+            'avg_confidence_score': after_stats.get('avg_confidence_score', 0),
+            'avg_agency_alignment': after_stats.get('avg_agency_alignment', 0),
+            'contamination_rate': (after_stats.get('contaminated_records', 0) / max(after_stats.get('total_grants', 1), 1)) * 100,
+            'compound_keyword_coverage': (after_stats.get('compound_keyword_matches', 0) / max(after_stats.get('total_grants', 1), 1)) * 100,
+            'contact_coverage_rate': (after_stats.get('grants_with_contact_info', 0) / max(after_stats.get('total_grants', 1), 1)) * 100
+        }
+        
+        total_added['precision_metrics'] = precision_metrics
+        
+        # 4. Final Summary
+        self.logger.info("\n" + "=" * 60)
+        self.logger.info("🎉 COMPREHENSIVE COLLECTION WITH CONTACTS COMPLETE!")
+        self.logger.info("=" * 60)
+        self.logger.info(f"📊 Enhanced awards collected: {total_added['awards']}")
+        self.logger.info(f"📋 Enhanced solicitations collected: {total_added['solicitations']}")
+        self.logger.info(f"✅ Successful agencies: {len(total_added['successful_agencies'])}")
+        self.logger.info(f"❌ Failed agencies: {len(total_added['failed_agencies'])}")
+        self.logger.info(f"🎯 Biotools validation rate: {precision_metrics['biotools_validated_rate']:.1f}%")
+        self.logger.info(f"📞 Contact info coverage: {precision_metrics['contact_coverage_rate']:.1f}%")
+        self.logger.info(f"📈 Avg relevance score: {precision_metrics['avg_relevance_score']:.2f}")
+        
+        return total_added
 
     def fetch_enhanced_solicitations(self) -> List[Dict]:
         """Enhanced solicitation fetching with biotools focus"""
         self.logger.info("Fetching enhanced biotools solicitations...")
         
         solicitations = []
-        max_rows = 50  # API limit
+        max_rows = 50
         start = 0
         
         while True:
@@ -489,7 +808,7 @@ class CompleteBiotoolsScraper:
                     relevance_score, confidence_score, categories, keywords, compounds = \
                         self.calculate_biotools_relevance(title, description, program)
                     
-                    if relevance_score >= 1.0:  # Slightly lower threshold for solicitations
+                    if relevance_score >= 1.0:
                         # Calculate agency alignment
                         agency_alignment = self.calculate_agency_alignment(
                             agency, program, title, description
@@ -521,76 +840,6 @@ class CompleteBiotoolsScraper:
         self.logger.info(f"✅ Collected {len(solicitations)} enhanced biotools solicitations")
         return solicitations
 
-    def save_enhanced_awards(self, awards: List[Dict]) -> int:
-        """Save enhanced awards with comprehensive data"""
-        if not awards:
-            return 0
-        
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        saved_count = 0
-        
-        for award in awards:
-            try:
-                # Extract and clean enhanced data
-                title = award.get('award_title', '')[:500]
-                description = award.get('description', '')[:2000] if award.get('description') else ''
-                abstract = award.get('abstract', '')[:2000] if award.get('abstract') else ''
-                agency = award.get('agency', '')
-                program = award.get('program', '')
-                award_number = award.get('award_number', '')
-                firm = award.get('firm', '')
-                pi = award.get('principal_investigator', '')
-                
-                # Handle amount
-                amount = 0
-                if award.get('award_amount'):
-                    try:
-                        amount_str = str(award['award_amount']).replace(',', '').replace('$', '')
-                        amount = int(float(amount_str))
-                    except (ValueError, TypeError):
-                        amount = 0
-                
-                award_date = award.get('award_date', '')
-                end_date = award.get('end_date', '')
-                phase = award.get('phase', '')
-                keywords = award.get('keywords', '')
-                
-                # Enhanced scoring data
-                relevance_score = award.get('relevance_score', 0.0)
-                confidence_score = award.get('confidence_score', 0.0)
-                biotools_category = award.get('biotools_category', '')
-                compound_matches = award.get('compound_keyword_matches', '')
-                agency_alignment = award.get('agency_alignment_score', 0.0)
-                url = award.get('url', '')
-                
-                # Insert enhanced award
-                cursor.execute('''
-                    INSERT OR REPLACE INTO grants 
-                    (title, description, abstract, agency, program, award_number, firm, 
-                     principal_investigator, amount, award_date, end_date, phase, keywords, 
-                     source, grant_type, relevance_score, confidence_score, biotools_category,
-                     compound_keyword_matches, agency_alignment_score, url, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    title, description, abstract, agency, program, award_number, firm,
-                    pi, amount, award_date, end_date, phase, keywords,
-                    'SBIR', 'award', relevance_score, confidence_score, biotools_category,
-                    compound_matches, agency_alignment, url, datetime.now().isoformat()
-                ))
-                
-                saved_count += 1
-                
-            except Exception as e:
-                self.logger.error(f"Error saving award {award.get('award_number', 'unknown')}: {e}")
-                continue
-        
-        conn.commit()
-        conn.close()
-        
-        self.logger.info(f"💾 Saved {saved_count} enhanced awards to database")
-        return saved_count
-
     def save_enhanced_solicitations(self, solicitations: List[Dict]) -> int:
         """Save enhanced solicitations with comprehensive data"""
         if not solicitations:
@@ -604,7 +853,7 @@ class CompleteBiotoolsScraper:
             try:
                 # Extract and clean enhanced data
                 title = solicitation.get('solicitation_title', '')[:500]
-                description = solicitation.get('description', '')[:2000] if solicitation.get('description') else ''
+                description = solicitation.get('description', '')[:5000] if solicitation.get('description') else ''
                 agency = solicitation.get('agency', '')
                 program = solicitation.get('program', '')
                 solicitation_number = solicitation.get('solicitation_number', '')
@@ -651,7 +900,7 @@ class CompleteBiotoolsScraper:
         return saved_count
 
     def get_database_stats(self) -> Dict[str, Any]:
-        """Get comprehensive database statistics"""
+        """Get comprehensive database statistics including contact information coverage"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -671,6 +920,23 @@ class CompleteBiotoolsScraper:
             # Enhanced stats
             cursor.execute("SELECT COUNT(*) FROM grants WHERE relevance_score >= 1.5")
             stats['biotools_validated'] = cursor.fetchone()[0]
+            
+            # Contact information coverage
+            cursor.execute("""
+                SELECT COUNT(*) FROM grants 
+                WHERE (poc_email IS NOT NULL AND poc_email != '') 
+                   OR (pi_email IS NOT NULL AND pi_email != '')
+                   OR (poc_phone IS NOT NULL AND poc_phone != '')
+            """)
+            stats['grants_with_contact_info'] = cursor.fetchone()[0]
+            
+            # Company information coverage
+            cursor.execute("""
+                SELECT COUNT(*) FROM grants 
+                WHERE (company_url IS NOT NULL AND company_url != '') 
+                   OR (address1 IS NOT NULL AND address1 != '')
+            """)
+            stats['grants_with_company_info'] = cursor.fetchone()[0]
             
             cursor.execute("SELECT AVG(relevance_score), AVG(confidence_score), AVG(agency_alignment_score) FROM grants WHERE relevance_score > 0")
             result = cursor.fetchone()
@@ -717,318 +983,17 @@ class CompleteBiotoolsScraper:
                 stats['contaminated_records'] = 0
                 stats['compound_keyword_matches'] = 0
             
-            # Top compound keywords
-            try:
-                cursor.execute("""
-                    SELECT compound_keyword_matches, COUNT(*) 
-                    FROM grants 
-                    WHERE compound_keyword_matches IS NOT NULL AND compound_keyword_matches != '' 
-                    GROUP BY compound_keyword_matches 
-                    ORDER BY COUNT(*) DESC 
-                    LIMIT 10
-                """)
-                stats['top_compound_keywords'] = cursor.fetchall()
-            except sqlite3.OperationalError:
-                stats['top_compound_keywords'] = []
-            
         except Exception as e:
             self.logger.error(f"Error getting database stats: {e}")
         finally:
             conn.close()
         
         return stats
-    
-    def run_comprehensive_biotools_scraping(self, start_year: int = 2022) -> Dict[str, Any]:
-        """Run comprehensive biotools data collection with all enhancements"""
-        self.logger.info("🚀 Starting Comprehensive BioTools Data Collection")
-        self.logger.info("=" * 60)
-        
-        before_stats = self.get_database_stats()
-        self.logger.info(f"📊 Before: {before_stats.get('total_grants', 0)} total grants, {before_stats.get('biotools_validated', 0)} biotools-validated")
-        
-        total_added = {
-            'awards': 0,
-            'solicitations': 0,
-            'successful_agencies': [],
-            'failed_agencies': [],
-            'precision_metrics': {}
-        }
-        
-        # 1. Enhanced Awards Collection
-        self.logger.info("\n" + "=" * 40)
-        self.logger.info("🏆 ENHANCED AWARD COLLECTION")
-        
-        for agency in self.biotools_agencies.keys():
-            try:
-                self.logger.info(f"\nProcessing {agency} with enhanced filtering...")
-                awards = self.fetch_enhanced_awards_by_agency(agency, start_year)
-                saved = self.save_enhanced_awards(awards)
-                total_added['awards'] += saved
-                total_added['successful_agencies'].append(agency)
-                
-                # Inter-agency delay for API respect
-                time.sleep(5)
-                
-            except Exception as e:
-                self.logger.error(f"Failed to process {agency} awards: {e}")
-                total_added['failed_agencies'].append(agency)
-        
-        # 2. Enhanced Solicitations Collection
-        self.logger.info("\n" + "=" * 40)
-        self.logger.info("📋 ENHANCED SOLICITATION COLLECTION")
-        self.logger.info("⏳ Waiting 10 seconds for API recovery...")
-        time.sleep(10)
-        
-        try:
-            solicitations = self.fetch_enhanced_solicitations()
-            saved = self.save_enhanced_solicitations(solicitations)
-            total_added['solicitations'] += saved
-            
-        except Exception as e:
-            self.logger.error(f"Failed to process solicitations: {e}")
-        
-        # 3. Quality Assessment
-        self.logger.info("\n" + "=" * 40)
-        self.logger.info("🎯 QUALITY ASSESSMENT")
-        
-        after_stats = self.get_database_stats()
-        
-        # Calculate precision metrics
-        precision_metrics = {
-            'biotools_validated_rate': (after_stats.get('biotools_validated', 0) / max(after_stats.get('total_grants', 1), 1)) * 100,
-            'avg_relevance_score': after_stats.get('avg_relevance_score', 0),
-            'avg_confidence_score': after_stats.get('avg_confidence_score', 0),
-            'avg_agency_alignment': after_stats.get('avg_agency_alignment', 0),
-            'contamination_rate': (after_stats.get('contaminated_records', 0) / max(after_stats.get('total_grants', 1), 1)) * 100,
-            'compound_keyword_coverage': (after_stats.get('compound_keyword_matches', 0) / max(after_stats.get('total_grants', 1), 1)) * 100
-        }
-        
-        total_added['precision_metrics'] = precision_metrics
-        
-        # 4. Final Summary
-        self.logger.info("\n" + "=" * 50)
-        self.logger.info("🎉 COMPREHENSIVE COLLECTION COMPLETE!")
-        self.logger.info("=" * 50)
-        self.logger.info(f"📊 Enhanced awards collected: {total_added['awards']}")
-        self.logger.info(f"📋 Enhanced solicitations collected: {total_added['solicitations']}")
-        self.logger.info(f"✅ Successful agencies: {len(total_added['successful_agencies'])}")
-        self.logger.info(f"❌ Failed agencies: {len(total_added['failed_agencies'])}")
-        self.logger.info(f"🎯 Biotools validation rate: {precision_metrics['biotools_validated_rate']:.1f}%")
-        self.logger.info(f"📈 Avg relevance score: {precision_metrics['avg_relevance_score']:.2f}")
-        self.logger.info(f"🔍 Avg confidence score: {precision_metrics['avg_confidence_score']:.2f}")
-        self.logger.info(f"⚠️  Contamination rate: {precision_metrics['contamination_rate']:.1f}%")
-        
-        return total_added
-
-    def run_solicitations_only(self) -> int:
-        """Run enhanced solicitations collection only"""
-        self.logger.info("📋 Running Enhanced Solicitations Collection Only")
-        
-        try:
-            solicitations = self.fetch_enhanced_solicitations()
-            saved = self.save_enhanced_solicitations(solicitations)
-            self.logger.info(f"✅ Enhanced solicitations updated: {saved}")
-            return saved
-        except Exception as e:
-            self.logger.error(f"Failed to update solicitations: {e}")
-            return 0
-
-    def update_recent_awards(self, months: int = 6) -> int:
-        """Update recent awards with enhanced processing"""
-        self.logger.info(f"🔄 Updating recent awards with enhanced processing (last {months} months)")
-        
-        cutoff_date = datetime.now() - timedelta(days=months * 30)
-        start_year = cutoff_date.year
-        
-        total_awards = 0
-        agencies = ['HHS', 'NSF', 'DOD', 'DOE']  # Focus on key biotools agencies
-        
-        for agency in agencies:
-            try:
-                self.logger.info(f"Updating {agency} recent awards...")
-                awards = self.fetch_enhanced_awards_by_agency(agency, start_year)
-                saved = self.save_enhanced_awards(awards)
-                total_awards += saved
-                
-            except Exception as e:
-                self.logger.error(f"Failed to update {agency} awards: {e}")
-        
-        self.logger.info(f"✅ Updated {total_awards} recent enhanced awards")
-        return total_awards
-
-    def test_comprehensive_api_connectivity(self) -> Dict[str, Any]:
-        """Comprehensive API and keyword testing"""
-        self.logger.info("🔍 Running Comprehensive API and Keyword Testing...")
-        
-        test_results = {
-            'api_endpoints': {},
-            'agency_validation': {},
-            'compound_keyword_test': {},
-            'overall_status': 'unknown'
-        }
-        
-        # 1. Test API endpoints
-        self.logger.info("\n📡 Testing API Endpoints...")
-        
-        endpoints = [
-            ('awards', {'rows': 1}),
-            ('solicitations', {'rows': 5}),
-            ('firm', {'rows': 1})
-        ]
-        
-        for endpoint, params in endpoints:
-            try:
-                data = self.make_api_request(endpoint, params)
-                success = data is not None and len(data) >= 0
-                test_results['api_endpoints'][endpoint] = {
-                    'accessible': success,
-                    'sample_size': len(data) if data else 0
-                }
-                self.logger.info(f"  {endpoint}: {'✅ Working' if success else '❌ Failed'}")
-            except Exception as e:
-                test_results['api_endpoints'][endpoint] = {'accessible': False, 'error': str(e)}
-                self.logger.error(f"  {endpoint}: ❌ Failed - {e}")
-        
-        # 2. Test agency-specific data access
-        self.logger.info("\n🏛️  Testing Agency Data Access...")
-        
-        for agency in list(self.biotools_agencies.keys())[:3]:  # Test first 3 agencies
-            try:
-                data = self.make_api_request('awards', {'agency': agency, 'rows': 5})
-                success = data is not None and len(data) > 0
-                
-                biotools_count = 0
-                if success and data:
-                    for award in data:
-                        title = award.get('award_title', '')
-                        abstract = award.get('abstract', '')
-                        if self.is_biotools_relevant(title, abstract):
-                            biotools_count += 1
-                
-                test_results['agency_validation'][agency] = {
-                    'api_accessible': success,
-                    'sample_size': len(data) if data else 0,
-                    'biotools_matches': biotools_count,
-                    'biotools_rate': (biotools_count / len(data) * 100) if data and len(data) > 0 else 0
-                }
-                
-                self.logger.info(f"  {agency}: {'✅' if success else '❌'} - {biotools_count}/{len(data) if data else 0} biotools relevant")
-                
-            except Exception as e:
-                test_results['agency_validation'][agency] = {'api_accessible': False, 'error': str(e)}
-                self.logger.error(f"  {agency}: ❌ Failed - {e}")
-        
-        # 3. Test compound keyword effectiveness
-        self.logger.info("\n🔬 Testing Compound Keyword Effectiveness...")
-        
-        try:
-            # Sample some recent awards to test keyword effectiveness
-            sample_data = self.make_api_request('awards', {'rows': 50, 'year': 2024})
-            
-            if sample_data:
-                compound_hits = 0
-                total_tested = len(sample_data)
-                
-                for award in sample_data:
-                    title = award.get('award_title', '')
-                    abstract = award.get('abstract', '')
-                    text = f"{title} {abstract}".lower()
-                    
-                    for compound in self.compound_keywords:
-                        if compound.lower() in text:
-                            compound_hits += 1
-                            break
-                
-                effectiveness_rate = (compound_hits / total_tested * 100) if total_tested > 0 else 0
-                
-                test_results['compound_keyword_test'] = {
-                    'tested_records': total_tested,
-                    'compound_hits': compound_hits,
-                    'effectiveness_rate': effectiveness_rate
-                }
-                
-                self.logger.info(f"  Compound keywords: {compound_hits}/{total_tested} hits ({effectiveness_rate:.1f}%)")
-                
-            else:
-                test_results['compound_keyword_test'] = {'error': 'No sample data available'}
-                
-        except Exception as e:
-            test_results['compound_keyword_test'] = {'error': str(e)}
-            self.logger.error(f"  Compound keyword test failed: {e}")
-        
-        # 4. Overall assessment
-        working_apis = sum(1 for ep in test_results['api_endpoints'].values() if ep.get('accessible', False))
-        working_agencies = sum(1 for agency in test_results['agency_validation'].values() if agency.get('api_accessible', False))
-        
-        self.logger.info(f"\n📊 COMPREHENSIVE TEST RESULTS:")
-        self.logger.info(f"  API Endpoints: {working_apis}/3 working")
-        self.logger.info(f"  Agency Access: {working_agencies}/{len(test_results['agency_validation'])} working")
-        
-        compound_effectiveness = test_results.get('compound_keyword_test', {}).get('effectiveness_rate', 0)
-        self.logger.info(f"  Compound Keywords: {compound_effectiveness:.1f}% effectiveness")
-        
-        # Overall status
-        if working_apis == 3 and working_agencies >= 2 and compound_effectiveness >= 10:
-            test_results['overall_status'] = 'excellent'
-            self.logger.info("🎉 Excellent! All systems working optimally. Ready for comprehensive biotools scraping.")
-        elif working_apis >= 1 and working_agencies >= 2:
-            test_results['overall_status'] = 'good'
-            self.logger.info("✅ Good! Can proceed with available endpoints and agencies.")
-        else:
-            test_results['overall_status'] = 'limited'
-            self.logger.warning("⚠️  Limited API access. Check network connectivity and API status.")
-        
-        # Recommendations
-        self.logger.info(f"\n💡 RECOMMENDATIONS:")
-        if working_agencies < len(self.biotools_agencies):
-            failed_agencies = [agency for agency, data in test_results['agency_validation'].items() 
-                             if not data.get('api_accessible', False)]
-            working_list = [agency for agency in self.biotools_agencies.keys() if agency not in failed_agencies]
-            self.logger.info(f"  • Focus on working agencies: {working_list}")
-        
-        if test_results.get('compound_keyword_test', {}).get('effectiveness_rate', 0) < 15:
-            self.logger.info("  • Consider expanding compound keyword list")
-            self.logger.info("  • Review agency-specific biotools programs")
-        
-        if working_apis < 2:
-            self.logger.info("  • Check SBIR.gov API status")
-            self.logger.info("  • Try again in 30 minutes")
-            self.logger.info("  • Consider alternative data sources")
-        
-        return test_results
-
-    def show_enhanced_database_stats(self):
-        """Display enhanced database statistics"""
-        stats = self.get_database_stats()
-        
-        self.logger.info("\n📊 ENHANCED DATABASE STATISTICS")
-        self.logger.info("=" * 40)
-        self.logger.info(f"Total grants: {stats.get('total_grants', 0)}")
-        self.logger.info(f"Awards: {stats.get('awards_count', 0)}")
-        self.logger.info(f"Solicitations: {stats.get('solicitations_count', 0)}")
-        self.logger.info(f"Biotools validated: {stats.get('biotools_validated', 0)}")
-        
-        self.logger.info(f"\n🎯 Quality Metrics:")
-        self.logger.info(f"Avg relevance score: {stats.get('avg_relevance_score', 0):.2f}")
-        self.logger.info(f"Avg confidence score: {stats.get('avg_confidence_score', 0):.2f}")
-        self.logger.info(f"Avg agency alignment: {stats.get('avg_agency_alignment', 0):.2f}")
-        self.logger.info(f"Contaminated records: {stats.get('contaminated_records', 0)}")
-        self.logger.info(f"Compound keyword matches: {stats.get('compound_keyword_matches', 0)}")
-        
-        if stats.get('top_agencies'):
-            self.logger.info(f"\n🏛️  Top agencies:")
-            for agency, count in stats['top_agencies'][:5]:
-                self.logger.info(f"  {agency}: {count}")
-        
-        if stats.get('top_biotools_categories'):
-            self.logger.info(f"\n🔬 Top biotools categories:")
-            for category, count in stats['top_biotools_categories'][:5]:
-                self.logger.info(f"  {category}: {count}")
 
 
 def main():
-    """Enhanced main execution function with comprehensive options"""
-    scraper = CompleteBiotoolsScraper()
+    """Enhanced main execution function with contact information collection"""
+    scraper = CompleteBiotoolsScraperWithContacts()
     
     import sys
     
@@ -1036,11 +1001,11 @@ def main():
         command = sys.argv[1].lower()
         
         if command in ['comprehensive', 'full', 'complete']:
-            # Comprehensive biotools scraping
+            # Comprehensive biotools scraping with contact information
             start_year = int(sys.argv[2]) if len(sys.argv) > 2 else 2022
             results = scraper.run_comprehensive_biotools_scraping(start_year)
             
-            print(f"\n🎯 COMPREHENSIVE SCRAPING SUMMARY:")
+            print(f"\n🎯 COMPREHENSIVE SCRAPING WITH CONTACTS SUMMARY:")
             print(f"  Awards: {results['awards']}")
             print(f"  Solicitations: {results['solicitations']}")
             print(f"  Successful agencies: {len(results.get('successful_agencies', []))}")
@@ -1049,45 +1014,47 @@ def main():
             if 'precision_metrics' in results:
                 metrics = results['precision_metrics']
                 print(f"  Validation Rate: {metrics['biotools_validated_rate']:.1f}%")
+                print(f"  Contact Coverage: {metrics['contact_coverage_rate']:.1f}%")
                 print(f"  Avg Relevance: {metrics['avg_relevance_score']:.2f}")
                 print(f"  Avg Confidence: {metrics['avg_confidence_score']:.2f}")
-                print(f"  Contamination: {metrics['contamination_rate']:.1f}%")
             
         elif command == 'solicitations':
             # Enhanced solicitations only
             result = scraper.run_solicitations_only()
             print(f"✅ Solicitations updated: {result}")
             
-        elif command == 'recent':
-            # Enhanced recent awards
-            months = int(sys.argv[2]) if len(sys.argv) > 2 else 6
-            result = scraper.update_recent_awards(months)
-            print(f"✅ Recent awards updated: {result}")
-            
-        elif command == 'test':
-            # Comprehensive testing
-            results = scraper.test_comprehensive_api_connectivity()
-            print(f"\n🔍 Test Status: {results['overall_status'].upper()}")
+        elif command == 'companies':
+            # Fetch and cache company data
+            companies = scraper.fetch_company_data()
+            print(f"✅ Company data cached: {len(companies)} entries")
             
         elif command == 'stats':
-            # Enhanced statistics
-            scraper.show_enhanced_database_stats()
+            # Enhanced statistics with contact info
+            stats = scraper.get_database_stats()
+            print(f"\n📊 ENHANCED DATABASE STATISTICS WITH CONTACT INFO:")
+            print(f"  Total grants: {stats['total_grants']}")
+            print(f"  Awards: {stats['awards_count']}")
+            print(f"  Solicitations: {stats['solicitations_count']}")
+            print(f"  Biotools validated: {stats['biotools_validated']}")
+            print(f"  Grants with contact info: {stats.get('grants_with_contact_info', 0)}")
+            print(f"  Grants with company info: {stats.get('grants_with_company_info', 0)}")
             
         else:
-            print("Complete Enhanced BioTools Scraper Usage:")
-            print("  python app/scraper.py comprehensive [start_year]  # Complete biotools collection")
-            print("  python app/scraper.py solicitations              # Update biotools solicitations")
-            print("  python app/scraper.py recent [months]            # Update recent awards")
-            print("  python app/scraper.py test                       # Comprehensive API testing")
-            print("  python app/scraper.py stats                      # Enhanced biotools statistics")
+            print("Enhanced BioTools Scraper with Contact Information Usage:")
+            print("  python app/scraper.py comprehensive [start_year]  # Complete collection with contacts")
+            print("  python app/scraper.py solicitations              # Update solicitations")
+            print("  python app/scraper.py companies                  # Fetch company data")
+            print("  python app/scraper.py stats                      # Enhanced statistics")
             print("")
-            print("Aliases:")
-            print("  'full', 'complete' → comprehensive")
-            print("  Default behavior: comprehensive scraping from 2022")
+            print("New features:")
+            print("  • Comprehensive contact information collection")
+            print("  • Company details and addresses") 
+            print("  • Principal Investigator contact data")
+            print("  • Point of Contact information")
+            print("  • Enhanced company matching and caching")
     else:
-        # Default: run comprehensive biotools scraping from 2022
-        print("🚀 Starting default comprehensive biotools scraping from 2022...")
-        print("💡 Use 'python app/scraper.py test' to validate APIs and keywords first")
+        # Default: run comprehensive biotools scraping with contacts from 2022
+        print("🚀 Starting comprehensive biotools scraping with contact information from 2022...")
         scraper.run_comprehensive_biotools_scraping(2022)
 
 
