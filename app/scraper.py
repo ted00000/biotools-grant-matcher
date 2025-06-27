@@ -152,101 +152,121 @@ class CompleteBiotoolsScraperWithContacts:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Create comprehensive grants table with contact information
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS grants (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                description TEXT,
-                abstract TEXT,
-                agency TEXT,
-                program TEXT,
-                award_number TEXT UNIQUE,
-                firm TEXT,
-                principal_investigator TEXT,
-                amount INTEGER,
-                award_date TEXT,
-                end_date TEXT,
-                phase TEXT,
-                keywords TEXT,
-                source TEXT DEFAULT 'SBIR',
-                grant_type TEXT DEFAULT 'award',
-                relevance_score REAL DEFAULT 0.0,
-                confidence_score REAL DEFAULT 0.0,
-                biotools_category TEXT,
-                compound_keyword_matches TEXT,
-                agency_alignment_score REAL DEFAULT 0.0,
-                url TEXT,
+        try:
+            # Drop existing table if it exists with old schema to avoid conflicts
+            cursor.execute("DROP TABLE IF EXISTS grants")
+            cursor.execute("DROP TABLE IF EXISTS companies")
+            
+            # Create comprehensive grants table with contact information
+            cursor.execute('''
+                CREATE TABLE grants (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    abstract TEXT,
+                    agency TEXT,
+                    program TEXT,
+                    award_number TEXT UNIQUE,
+                    firm TEXT,
+                    principal_investigator TEXT,
+                    amount INTEGER,
+                    award_date TEXT,
+                    end_date TEXT,
+                    phase TEXT,
+                    keywords TEXT,
+                    source TEXT DEFAULT 'SBIR',
+                    grant_type TEXT DEFAULT 'award',
+                    relevance_score REAL DEFAULT 0.0,
+                    confidence_score REAL DEFAULT 0.0,
+                    biotools_category TEXT,
+                    compound_keyword_matches TEXT,
+                    agency_alignment_score REAL DEFAULT 0.0,
+                    url TEXT,
+                    
+                    -- Contact Information
+                    poc_name TEXT,
+                    poc_title TEXT,
+                    poc_phone TEXT,
+                    poc_email TEXT,
+                    pi_phone TEXT,
+                    pi_email TEXT,
+                    ri_poc_name TEXT,
+                    ri_poc_phone TEXT,
+                    
+                    -- Company Information
+                    company_name TEXT,
+                    company_url TEXT,
+                    address1 TEXT,
+                    address2 TEXT,
+                    city TEXT,
+                    state TEXT,
+                    zip_code TEXT,
+                    uei TEXT,
+                    duns TEXT,
+                    number_awards INTEGER,
+                    hubzone_owned TEXT,
+                    socially_economically_disadvantaged TEXT,
+                    woman_owned TEXT,
+                    
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Create companies table for comprehensive company data
+            cursor.execute('''
+                CREATE TABLE companies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    uei TEXT UNIQUE,
+                    company_name TEXT,
+                    duns TEXT,
+                    number_awards INTEGER,
+                    address1 TEXT,
+                    address2 TEXT,
+                    city TEXT,
+                    state TEXT,
+                    zip_code TEXT,
+                    company_url TEXT,
+                    hubzone_owned TEXT,
+                    socially_economically_disadvantaged TEXT,
+                    woman_owned TEXT,
+                    last_updated TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            conn.commit()
+            self.logger.info("Tables created successfully")
+            
+            # Create indexes for performance (after tables are created)
+            try:
+                indexes = [
+                    "CREATE INDEX IF NOT EXISTS idx_grants_title ON grants(title)",
+                    "CREATE INDEX IF NOT EXISTS idx_grants_agency ON grants(agency)",
+                    "CREATE INDEX IF NOT EXISTS idx_grants_relevance ON grants(relevance_score)",
+                    "CREATE INDEX IF NOT EXISTS idx_grants_biotools_category ON grants(biotools_category)",
+                    "CREATE INDEX IF NOT EXISTS idx_grants_confidence ON grants(confidence_score)",
+                    "CREATE INDEX IF NOT EXISTS idx_grants_company_name ON grants(company_name)",
+                    "CREATE INDEX IF NOT EXISTS idx_grants_uei ON grants(uei)",
+                    "CREATE INDEX IF NOT EXISTS idx_companies_uei ON companies(uei)",
+                    "CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(company_name)"
+                ]
                 
-                -- Contact Information
-                poc_name TEXT,
-                poc_title TEXT,
-                poc_phone TEXT,
-                poc_email TEXT,
-                pi_phone TEXT,
-                pi_email TEXT,
-                ri_poc_name TEXT,
-                ri_poc_phone TEXT,
-                
-                -- Company Information
-                company_name TEXT,
-                company_url TEXT,
-                address1 TEXT,
-                address2 TEXT,
-                city TEXT,
-                state TEXT,
-                zip_code TEXT,
-                uei TEXT,
-                duns TEXT,
-                number_awards INTEGER,
-                hubzone_owned TEXT,
-                socially_economically_disadvantaged TEXT,
-                woman_owned TEXT,
-                
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Create companies table for comprehensive company data
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS companies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                uei TEXT UNIQUE,
-                company_name TEXT,
-                duns TEXT,
-                number_awards INTEGER,
-                address1 TEXT,
-                address2 TEXT,
-                city TEXT,
-                state TEXT,
-                zip_code TEXT,
-                company_url TEXT,
-                hubzone_owned TEXT,
-                socially_economically_disadvantaged TEXT,
-                woman_owned TEXT,
-                last_updated TEXT DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        # Create indexes for performance
-        indexes = [
-            "CREATE INDEX IF NOT EXISTS idx_grants_title ON grants(title)",
-            "CREATE INDEX IF NOT EXISTS idx_grants_agency ON grants(agency)",
-            "CREATE INDEX IF NOT EXISTS idx_grants_relevance ON grants(relevance_score)",
-            "CREATE INDEX IF NOT EXISTS idx_grants_biotools_category ON grants(biotools_category)",
-            "CREATE INDEX IF NOT EXISTS idx_grants_confidence ON grants(confidence_score)",
-            "CREATE INDEX IF NOT EXISTS idx_grants_company_name ON grants(company_name)",
-            "CREATE INDEX IF NOT EXISTS idx_grants_uei ON grants(uei)",
-            "CREATE INDEX IF NOT EXISTS idx_companies_uei ON companies(uei)",
-            "CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(company_name)"
-        ]
-        
-        for index_sql in indexes:
-            cursor.execute(index_sql)
-        
-        conn.commit()
-        conn.close()
-        self.logger.info("Database initialized with comprehensive contact information schema")
+                for index_sql in indexes:
+                    try:
+                        cursor.execute(index_sql)
+                    except sqlite3.OperationalError as e:
+                        self.logger.warning(f"Could not create index: {index_sql} - {e}")
+                        continue
+            except Exception as e:
+                self.logger.warning(f"Error creating indexes: {e}")
+            
+            conn.commit()
+            self.logger.info("Database initialized with comprehensive contact information schema")
+            
+        except Exception as e:
+            self.logger.error(f"Error initializing database: {e}")
+            conn.rollback()
+        finally:
+            conn.close()
 
     def calculate_biotools_relevance(self, title: str, abstract: str = "", program: str = "") -> tuple:
         """Calculate comprehensive biotools relevance with confidence scoring"""
