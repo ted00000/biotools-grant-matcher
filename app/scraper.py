@@ -674,7 +674,7 @@ class CompleteBiotoolsScraperWithContacts:
                 socially_economically_disadvantaged = award.get('socially_economically_disadvantaged', '')
                 woman_owned = award.get('woman_owned', '')
                 
-                # Insert enhanced award with contact information
+                # Insert enhanced award with contact information (43 columns total)
                 cursor.execute('''
                     INSERT OR REPLACE INTO grants 
                     (title, description, abstract, agency, program, award_number, firm, 
@@ -686,7 +686,7 @@ class CompleteBiotoolsScraperWithContacts:
                      city, state, zip_code, uei, duns, number_awards, hubzone_owned,
                      socially_economically_disadvantaged, woman_owned, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     title, description, abstract, agency, program, award_number, firm,
                     pi, amount, award_date, end_date, phase, keywords,
@@ -701,7 +701,9 @@ class CompleteBiotoolsScraperWithContacts:
                 saved_count += 1
                 
             except Exception as e:
-                self.logger.error(f"Error saving award {award.get('award_number', 'unknown')}: {e}")
+                award_id = award.get('award_number', award.get('award_title', 'unknown'))
+                self.logger.error(f"Error saving award {award_id}: {e}")
+                self.logger.debug(f"Award data keys: {list(award.keys())}")
                 continue
         
         conn.commit()
