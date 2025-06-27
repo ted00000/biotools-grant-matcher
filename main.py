@@ -773,7 +773,299 @@ def get_stats():
         }), 500
 
 # Keep all other existing routes (search, feedback, health, etc.)
-# ... (preserving existing routes for brevity)
+@app.route('/api/search', methods=['POST'])
+@limiter.limit("50 per hour;5 per minute")
+def search_grants():
+    """Enhanced biotools search with mandatory taxonomy validation and browse mode support"""
+    client_ip = get_remote_address()
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        
+        # Query is now optional (can be empty for browse mode)
+        query = data.get('query', '').strip()
+        limit = min(data.get('limit', 20), 50)
+        filters = data.get('filters', {})
+        
+        # Extract biotools taxonomy requirements
+        tool_types = filters.get('tool_types', [])
+        focus_areas = filters.get('focus_areas', [])
+        browse_mode = filters.get('browse_mode', False) or len(query) == 0
+        
+        # Validate biotools requirements
+        if not tool_types or not focus_areas:
+            return jsonify({
+                'error': 'Biotools taxonomy validation failed',
+                'message': 'Must select at least one Tool Type and Focus Area for precision biotools search',
+                'required': {
+                    'tool_types': tool_types,
+                    'focus_areas': focus_areas
+                }
+            }), 400
+        
+        # Validate query if provided (not in browse mode)
+        if not browse_mode and len(query) < 2:
+            return jsonify({'error': 'Query too short (minimum 2 characters)'}), 400
+        
+        # Check for suspicious patterns in query if provided
+        if query:
+            suspicious_patterns = ['union', 'select', 'drop', 'delete', 'insert', '--', '/*', '*/', ';']
+            query_lower = query.lower()
+            if any(pattern in query_lower for pattern in suspicious_patterns):
+                logger.warning(f"Suspicious query detected from {client_ip}: {query}")
+                return jsonify({'error': 'Invalid query format'}), 400
+        
+        # Perform biotools-validated search using simplified approach
+        grants = search_grants_with_contacts(query, limit, filters)
+        
+        # Log the search with biotools context
+        data_type = filters.get('data_type', 'all')
+        mode = "browse" if browse_mode else "search"
+        logger.info(f"Biotools {mode}: query='{query}', types={tool_types}, areas={focus_areas}, results={len(grants)}, ip={client_ip}")
+        
+        # Create display query for frontend
+        if browse_mode:
+            display_query = f"Browsing: {', '.join(tool_types)} • {', '.join(focus_areas)}"
+        else:
+            display_query = query
+        
+        return jsonify({
+            'query': display_query,
+            'original_query': query,
+            'browse_mode': browse_mode,
+            'data_type': data_type,
+            'tool_types': tool_types,
+            'focus_areas': focus_areas,
+            'results': grants,
+            'total_found': len(grants),
+            'biotools_validated': True,
+            'precision_mode': True,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except ValueError as e:
+        logger.warning(f"Validation error from {client_ip}: {e}")
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Search error from {client_ip}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+def search_grants_with_contacts(query: str, limit: int = 20, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    """Simplified search function that works with the enhanced contact database"""
+    if not filters:
+        filters = {}
+    
+    # Extract biotools taxonomy from filters
+    tool_types = filters.get('tool_types', [])
+    focus_areas = filters.get('focus_areas', [])
+    browse_mode = filters.get('browse_mode', False) or len(query.strip()) == 0
+    data_type = filters.get('data_type', 'all')
+    
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    try:
+        # Build basic query
+        base_query = "SELECT * FROM grants WHERE relevance_score >= 1.5"
+        params = []
+        
+        # Add data type filter
+        if data_type != 'all':
+            if data_type == 'awards':
+                base_query += " AND grant_type = 'award'"
+            elif data_type == 'solicitations':
+                base_query += " AND grant_type = 'solicitation'"
+            elif data_type == 'companies':
+                base_query += " AND (company_name IS NOT NULL OR firm IS NOT NULL)"
+        
+        # Add text search if not in browse mode
+        if not browse_mode and query:
+            base_query += " AND (title LIKE ? OR description LIKE ? OR keywords LIKE ?)"
+            search_pattern = f"%{query}%"
+            params.extend([search_pattern, search_pattern, search_pattern])
+        
+        # Add biotools category filtering (simplified)
+        category_filters = []
+        for tool_type in tool_types:
+            category_filters.append(f"biotools_category LIKE '%{tool_type}%'")
+        for focus_area in focus_areas:
+            category_filters.append(f"biotools_category LIKE '%{focus_area}%'")
+        
+        if category_filters:
+            base_query += f" AND ({' OR '.join(category_filters)})"
+        
+        # Order by relevance and limit
+        base_query += " ORDER BY relevance_score DESC, confidence_score DESC LIMIT ?"
+        params.append(limit)
+        
+        cursor.execute(base_query, params)
+        results = cursor.fetchall()
+        
+        grants = []
+        for row in results:
+            grant = dict(row)
+            
+            # Add computed fields for display
+            grant['inferred_type'] = grant.get('grant_type', 'award')
+            grant['display_title'] = grant.get('title', 'Untitled')
+            grant['company_name_display'] = grant.get('company_name') or grant.get('firm')
+            
+            # Add contact availability flags
+            grant['has_any_contact'] = bool(
+                grant.get('poc_email') or grant.get('pi_email') or 
+                grant.get('poc_phone') or grant.get('pi_phone') or 
+                grant.get('company_url')
+            )
+            
+            grants.append(grant)
+        
+        return grants
+        
+    except Exception as e:
+        logger.error(f"Search error: {e}")
+        return []
+    finally:
+        conn.close()
+
+
+@app.route('/api/feedback', methods=['POST'])
+@limiter.limit("20 per hour;2 per minute")
+def submit_feedback():
+    """Submit user feedback with validation"""
+    client_ip = get_remote_address()
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        
+        # Validate required fields
+        required_fields = ['grant_id', 'feedback_type']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        # Validate values
+        valid_types = ['helpful', 'not_helpful', 'applied', 'bookmarked']
+        if data['feedback_type'] not in valid_types:
+            return jsonify({'error': 'Invalid feedback type'}), 400
+        
+        grant_id = data['grant_id']
+        if not isinstance(grant_id, int) or grant_id <= 0:
+            return jsonify({'error': 'Invalid grant ID'}), 400
+        
+        # Sanitize text fields
+        notes = data.get('notes', '')
+        if len(notes) > 500:
+            return jsonify({'error': 'Notes too long (maximum 500 characters)'}), 400
+        
+        search_query = data.get('search_query', '')
+        if len(search_query) > 200:
+            return jsonify({'error': 'Search query too long (maximum 200 characters)'}), 400
+        
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS grant_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                grant_id INTEGER NOT NULL,
+                search_query TEXT,
+                feedback_type TEXT CHECK (feedback_type IN ('helpful', 'not_helpful', 'applied', 'bookmarked')),
+                user_session TEXT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                notes TEXT,
+                FOREIGN KEY (grant_id) REFERENCES grants(id) ON DELETE CASCADE
+            )
+        """)
+        
+        cursor.execute("""
+            INSERT INTO grant_feedback 
+            (grant_id, search_query, feedback_type, user_session, notes, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            grant_id,
+            search_query,
+            data['feedback_type'],
+            client_ip,
+            notes,
+            datetime.now().isoformat()
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        logger.info(f"Feedback submitted: grant_id={grant_id}, type={data['feedback_type']}, ip={client_ip}")
+        
+        return jsonify({'status': 'success', 'message': 'Feedback recorded'})
+        
+    except Exception as e:
+        logger.error(f"Feedback error from {client_ip}: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for monitoring"""
+    try:
+        # Check database connectivity
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM grants LIMIT 1")
+        grant_count = cursor.fetchone()[0]
+        conn.close()
+        
+        # Check biotools matcher
+        matcher_status = len(biotools_matcher.idf_cache) > 0
+        
+        health_status = {
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'database': {
+                'connected': True,
+                'grant_count': grant_count
+            },
+            'biotools_matcher': {
+                'initialized': matcher_status,
+                'idf_cache_size': len(biotools_matcher.idf_cache)
+            },
+            'version': '2.0.0-enhanced'
+        }
+        
+        return jsonify(health_status)
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Endpoint not found'}), 404
+
+
+@app.errorhandler(429)
+def rate_limit_handler(error):
+    client_ip = get_remote_address()
+    logger.warning(f"Rate limit exceeded for {client_ip}")
+    return jsonify({
+        'error': 'Rate limit exceeded',
+        'message': 'Please wait before making more requests'
+    }), 429
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {error}")
+    return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
     if not os.path.exists(DATABASE_PATH):
