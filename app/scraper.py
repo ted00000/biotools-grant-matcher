@@ -146,15 +146,15 @@ class EnhancedBiotoolsScraperWithTABA:
                     cursor.execute('''
                         INSERT OR IGNORE INTO grants 
                         (title, description, abstract, agency, program, award_number, firm, 
-                         principal_investigator, amount, award_date, end_date, phase, keywords, 
-                         source, grant_type, relevance_score, confidence_score, biotools_category,
-                         compound_keyword_matches, agency_alignment_score, url,
-                         has_taba_funding, taba_amount, taba_type, taba_keywords_matched, 
-                         taba_confidence_score, taba_eligible,
-                         poc_name, poc_title, poc_phone, poc_email, pi_phone, pi_email,
-                         ri_poc_name, ri_poc_phone, company_name, company_url, address1, address2,
-                         city, state, zip_code, uei, duns, number_awards, hubzone_owned,
-                         socially_economically_disadvantaged, woman_owned, updated_at)
+                        principal_investigator, amount, award_date, end_date, phase, keywords, 
+                        source, grant_type, relevance_score, confidence_score, biotools_category,
+                        compound_keyword_matches, agency_alignment_score, url,
+                        has_taba_funding, taba_amount, taba_type, taba_keywords_matched, 
+                        taba_confidence_score, taba_eligible,
+                        poc_name, poc_title, poc_phone, poc_email, pi_phone, pi_email,
+                        ri_poc_name, ri_poc_phone, company_name, company_url, address1, address2,
+                        city, state, zip_code, uei, duns, number_awards, hubzone_owned,
+                        socially_economically_disadvantaged, woman_owned, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
