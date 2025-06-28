@@ -52,6 +52,94 @@ class EnhancedBiotoolsScraperWithTABA:
     
     # ... [Previous methods remain the same until save_enhanced_awards_with_taba] ...
     
+    def init_enhanced_database(self):
+        """Initialize the enhanced database with TABA tracking and contact information"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            # Create the enhanced grants table with all TABA and contact fields
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS grants (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    abstract TEXT,
+                    agency TEXT,
+                    program TEXT,
+                    award_number TEXT,
+                    firm TEXT,
+                    principal_investigator TEXT,
+                    amount INTEGER,
+                    award_date TEXT,
+                    end_date TEXT,
+                    phase TEXT,
+                    keywords TEXT,
+                    source TEXT DEFAULT 'SBIR',
+                    grant_type TEXT DEFAULT 'award',
+                    relevance_score REAL DEFAULT 0.0,
+                    confidence_score REAL DEFAULT 0.0,
+                    biotools_category TEXT,
+                    compound_keyword_matches TEXT,
+                    agency_alignment_score REAL DEFAULT 0.0,
+                    url TEXT,
+                    
+                    -- Enhanced TABA Tracking
+                    has_taba_funding BOOLEAN DEFAULT FALSE,
+                    taba_amount INTEGER DEFAULT 0,
+                    taba_type TEXT,  -- 'explicit', 'likely', 'commercialization', 'none'
+                    taba_keywords_matched TEXT,
+                    taba_confidence_score REAL DEFAULT 0.0,
+                    taba_eligible BOOLEAN DEFAULT FALSE,
+                    
+                    -- Contact Information
+                    poc_name TEXT,
+                    poc_title TEXT,
+                    poc_phone TEXT,
+                    poc_email TEXT,
+                    pi_phone TEXT,
+                    pi_email TEXT,
+                    ri_poc_name TEXT,
+                    ri_poc_phone TEXT,
+                    
+                    -- Company Information
+                    company_name TEXT,
+                    company_url TEXT,
+                    address1 TEXT,
+                    address2 TEXT,
+                    city TEXT,
+                    state TEXT,
+                    zip_code TEXT,
+                    uei TEXT,
+                    duns TEXT,
+                    number_awards INTEGER,
+                    hubzone_owned TEXT,
+                    socially_economically_disadvantaged TEXT,
+                    woman_owned TEXT,
+                    
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    
+                    -- Create a unique constraint on combination of fields
+                    UNIQUE(award_number, agency, title)
+                )
+            ''')
+            
+            # Create indexes for better performance
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_agency ON grants(agency)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_relevance ON grants(relevance_score)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_taba ON grants(has_taba_funding)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_grant_type ON grants(grant_type)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_updated ON grants(updated_at)')
+            
+            conn.commit()
+            self.logger.info("Enhanced database with TABA tracking created successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Error creating enhanced database: {e}")
+            conn.rollback()
+        finally:
+            conn.close()
+    
     def save_enhanced_awards_with_taba(self, awards: List[Dict]) -> int:
         """Save enhanced awards with comprehensive TABA detection and tracking - FIXED"""
         if not awards:
