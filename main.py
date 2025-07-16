@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Enhanced BioTools Grant Matcher Backend with Comprehensive TABA Tracking
+Enhanced BioTools Grant Matcher Backend with Comprehensive TABA Tracking and Business Development Exports
 Handles company details, contact information, and enhanced TABA funding detection
 """
 
@@ -1055,6 +1055,302 @@ def search_grants():
     except Exception as e:
         logger.error(f"Search error from {client_ip}: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+# NEW: Business Development Export Endpoints
+
+@app.route('/api/export/business-development', methods=['GET'])
+@limiter.limit("5 per hour;1 per minute")
+def export_business_development_data():
+    """Export actionable business development data as CSV"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # Get all biotools-relevant grants with real contact and company data
+        cursor.execute("""
+            SELECT 
+                title,
+                agency,
+                program,
+                firm,
+                company_name,
+                principal_investigator,
+                amount,
+                phase,
+                award_date,
+                end_date,
+                award_number,
+                
+                -- Contact Information (REAL data)
+                poc_name,
+                poc_title,
+                poc_email,
+                poc_phone,
+                pi_email,
+                pi_phone,
+                ri_poc_name,
+                ri_poc_phone,
+                
+                -- Company Information (REAL data)
+                company_url,
+                address1,
+                city,
+                state,
+                zip_code,
+                uei,
+                duns,
+                number_awards,
+                
+                -- Business Intelligence
+                relevance_score,
+                biotools_category,
+                compound_keyword_matches,
+                
+                -- Company Classifications
+                woman_owned,
+                socially_economically_disadvantaged,
+                hubzone_owned,
+                
+                -- Additional useful fields
+                keywords,
+                description,
+                url
+                
+            FROM grants 
+            WHERE relevance_score >= 1.5
+            ORDER BY relevance_score DESC, amount DESC
+        """)
+        
+        results = cursor.fetchall()
+        conn.close()
+        
+        if not results:
+            return jsonify({'error': 'No biotools-relevant grants found'}), 404
+        
+        # Create CSV content
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write comprehensive business development headers
+        headers = [
+            # Grant Basics
+            'Grant_Title', 'Agency', 'Program', 'Award_Amount', 'Phase', 'Award_Date', 'End_Date', 'Award_Number',
+            
+            # Company Information (Key for BD)
+            'Company_Name', 'Company_URL', 'Address', 'City', 'State', 'ZIP', 'UEI', 'DUNS', 'Previous_Awards',
+            
+            # Primary Contacts (Most Important for BD)
+            'Principal_Investigator', 'PI_Email', 'PI_Phone',
+            'POC_Name', 'POC_Title', 'POC_Email', 'POC_Phone',
+            'RI_Contact_Name', 'RI_Contact_Phone',
+            
+            # Business Intelligence
+            'Biotools_Relevance_Score', 'Biotools_Categories', 'Key_Technology_Terms',
+            
+            # Company Classifications (Good for targeting)
+            'Woman_Owned', 'Socially_Disadvantaged', 'HUBZone',
+            
+            # Additional Context
+            'Keywords', 'Description_Preview', 'Source_URL'
+        ]
+        writer.writerow(headers)
+        
+        # Write data rows
+        for row in results:
+            # Clean and format the data for business use
+            title = (row[0] or '')[:100]  # Truncate long titles
+            agency = row[1] or ''
+            program = row[2] or ''
+            company_display = row[4] or row[3] or ''  # company_name or firm
+            pi = row[5] or ''
+            
+            # Format amount nicely
+            amount = ''
+            if row[6]:
+                try:
+                    amount = f"${int(row[6]):,}"
+                except (ValueError, TypeError):
+                    amount = str(row[6])
+            
+            phase = row[7] or ''
+            award_date = row[8] or ''
+            end_date = row[9] or ''
+            award_number = row[10] or ''
+            
+            # Contact information
+            poc_name = row[11] or ''
+            poc_title = row[12] or ''
+            poc_email = row[13] or ''
+            poc_phone = row[14] or ''
+            pi_email = row[15] or ''
+            pi_phone = row[16] or ''
+            ri_poc_name = row[17] or ''
+            ri_poc_phone = row[18] or ''
+            
+            # Company details
+            company_url = row[19] or ''
+            address1 = row[20] or ''
+            city = row[21] or ''
+            state = row[22] or ''
+            zip_code = row[23] or ''
+            uei = row[24] or ''
+            duns = row[25] or ''
+            number_awards = row[26] or ''
+            
+            # Business intelligence
+            relevance_score = f"{row[27]:.1f}" if row[27] else ''
+            biotools_category = row[28] or ''
+            compound_matches = row[29] or ''
+            
+            # Company classifications
+            woman_owned = 'Yes' if row[30] == 'Y' else 'No' if row[30] else ''
+            socially_disadvantaged = 'Yes' if row[31] == 'Y' else 'No' if row[31] else ''
+            hubzone = 'Yes' if row[32] == 'Y' else 'No' if row[32] else ''
+            
+            # Additional fields
+            keywords = (row[33] or '')[:200]  # Truncate long keywords
+            description_preview = (row[34] or '')[:300] + '...' if row[34] and len(row[34]) > 300 else (row[34] or '')
+            source_url = row[35] or ''
+            
+            writer.writerow([
+                title, agency, program, amount, phase, award_date, end_date, award_number,
+                company_display, company_url, address1, city, state, zip_code, uei, duns, number_awards,
+                pi, pi_email, pi_phone,
+                poc_name, poc_title, poc_email, poc_phone,
+                ri_poc_name, ri_poc_phone,
+                relevance_score, biotools_category, compound_matches,
+                woman_owned, socially_disadvantaged, hubzone,
+                keywords, description_preview, source_url
+            ])
+        
+        csv_content = output.getvalue()
+        output.close()
+        
+        # Return CSV as download
+        return Response(
+            csv_content,
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=biotools_business_development_{datetime.now().strftime("%Y%m%d")}.csv'
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Business development export error: {e}")
+        return jsonify({'error': 'Export failed'}), 500
+
+
+@app.route('/api/export/contact-focused', methods=['GET'])
+@limiter.limit("5 per hour;1 per minute") 
+def export_contact_focused_data():
+    """Export grants with emphasis on contact information quality"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
+        # Focus on grants with good contact information
+        cursor.execute("""
+            SELECT 
+                title,
+                agency,
+                firm,
+                company_name,
+                principal_investigator,
+                amount,
+                phase,
+                award_date,
+                
+                -- Contact scoring and info
+                poc_name,
+                poc_title, 
+                poc_email,
+                poc_phone,
+                pi_email,
+                pi_phone,
+                company_url,
+                
+                -- Address for direct contact
+                address1,
+                city,
+                state,
+                
+                relevance_score,
+                biotools_category,
+                number_awards,
+                award_number
+                
+            FROM grants 
+            WHERE relevance_score >= 1.5
+            AND (
+                (poc_email IS NOT NULL AND poc_email != '') OR
+                (pi_email IS NOT NULL AND pi_email != '') OR  
+                (poc_phone IS NOT NULL AND poc_phone != '') OR
+                (pi_phone IS NOT NULL AND pi_phone != '') OR
+                (company_url IS NOT NULL AND company_url != '')
+            )
+            ORDER BY 
+                CASE 
+                    WHEN poc_email IS NOT NULL AND poc_email != '' THEN 4
+                    WHEN pi_email IS NOT NULL AND pi_email != '' THEN 3  
+                    WHEN poc_phone IS NOT NULL AND poc_phone != '' THEN 2
+                    WHEN company_url IS NOT NULL AND company_url != '' THEN 1
+                    ELSE 0
+                END DESC,
+                relevance_score DESC
+        """)
+        
+        results = cursor.fetchall()
+        conn.close()
+        
+        if not results:
+            return jsonify({'error': 'No grants with contact information found'}), 404
+        
+        # Create CSV for contact-focused outreach
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        headers = [
+            'Company_Name', 'Grant_Title', 'Award_Amount', 'Phase', 'Agency',
+            'Principal_Investigator', 'PI_Email', 'PI_Phone',
+            'POC_Name', 'POC_Title', 'POC_Email', 'POC_Phone', 
+            'Company_Website', 'Address', 'City', 'State',
+            'Biotools_Score', 'Technology_Categories', 'Previous_Awards', 'Award_Number'
+        ]
+        writer.writerow(headers)
+        
+        for row in results:
+            company_name = row[3] or row[2] or ''
+            title = (row[0] or '')[:80]
+            
+            amount = ''
+            if row[5]:
+                try:
+                    amount = f"${int(row[5]):,}"
+                except:
+                    amount = str(row[5])
+            
+            writer.writerow([
+                company_name, title, amount, row[6] or '', row[1] or '',
+                row[4] or '', row[13] or '', row[14] or '',
+                row[9] or '', row[10] or '', row[11] or '', row[12] or '',
+                row[15] or '', row[16] or '', row[17] or '', row[18] or '',
+                f"{row[19]:.1f}" if row[19] else '', row[20] or '', row[21] or '', row[22] or ''
+            ])
+        
+        csv_content = output.getvalue()
+        output.close()
+        
+        return Response(
+            csv_content,
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename=biotools_contacts_{datetime.now().strftime("%Y%m%d")}.csv'
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Contact export error: {e}")
+        return jsonify({'error': 'Export failed'}), 500
 
 @app.route('/api/taba-stats', methods=['GET'])
 @limiter.limit("60 per hour;10 per minute")
